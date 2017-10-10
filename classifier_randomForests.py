@@ -11,6 +11,6 @@ import featureExtractor as fe
 numOutputClassesDefault = 5
 
 clf = RandomForestClassifier(max_depth=16, random_state=0)
-tX, tY = fe.getTrainableData()
+tX, tY, numFeatures = fe.getTrainableData()
 clf.fit(tX, tY)
 
