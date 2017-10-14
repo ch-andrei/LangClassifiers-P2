@@ -40,17 +40,17 @@ def generate_stats(tr):
         #features = list(set(features + sample[0].keys()))
         top_features[sample[1]] += Counter(sample[0])
         total_freq_per_class[sample[1]] += sum(sample[0].values())
-    print 'Training t1: ', time.time()-t0
+    print ('Training t1: ', time.time()-t0)
     # output of most_common: [('w', 28), ('r', 24)]
     top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
     features = []
     for x in top_features:
-        print '#feature/class: ', len(x)
+        print ('#feature/class: ', len(x))
         features += [y[0] for y in x]
-    #print len(features), features[:5]
+    #print (len(features), features[:5])
     features = list(set(features))
     nfeature = len(features)
-    print 'number of features: ',nfeature
+    print ('number of features: ',nfeature)
     t0 = time.time()
     for cls in classes:
         stats[cls] = {}
@@ -62,7 +62,7 @@ def generate_stats(tr):
                 if feature in sample.keys():
                     feature_in_cls += sample[feature]
             stats[cls][feature] = float(1 + feature_in_cls)/(nfeature + total_freq_per_class[cls])
-    print 'Training t2: ', time.time()-t0
+    print ('Training t2: ', time.time()-t0)
     save_obj(stats, 'model_{}-{}gram_{}Train_{}Feature'.format(MIN_GRAM, MAX_GRAM,NUM_SAMPLES,TOP_N_FEATURE))
     return stats, p_cls
 
@@ -92,9 +92,9 @@ def calculateClassProbability(sample, stats, p_cls):
 # predict
 def predict(sample, stats, p_cls):
     probabilities = calculateClassProbability(sample, stats, p_cls)
-    #print probabilities
+    #print (probabilities)
     best_cls = max(probabilities, key=probabilities.get)
-    #print best_cls, sample[1]
+    #print (best_cls, sample[1])
     #correct_flag = (best_cls == sample[1])
     return best_cls #, correct_flag
 
@@ -103,7 +103,7 @@ def run_test(tests, stats, p_cls):
     start_time = time.time()
     for sample in tests:
         predictions.append(predict(sample, stats, p_cls))
-    print 'Testing time: ', time.time() - start_time
+    print ('Testing time: ', time.time() - start_time)
     return  predictions
 
 def get_accuracy(answer, predictions):
@@ -111,22 +111,22 @@ def get_accuracy(answer, predictions):
     for x,y in zip(answer, predictions):
         if x==y:
             num_correct += 1
-    print 'Accuracy: ', float(num_correct) / len(answer) * 100, '%'
+    print ('Accuracy: ', float(num_correct) / len(answer) * 100, '%')
 
 def run_prediction(data, test):
     train, validation = split_data(data)
-    print 'Dataset split into training {}, validation {}'.format(len(train), len(validation))
+    print ('Dataset split into training {}, validation {}'.format(len(train), len(validation)))
     start_time = time.time()
     stats, p_cls = generate_stats(train)
-    print 'Traing time: ', time.time()-start_time
+    print ('Traing time: ', time.time()-start_time)
 
-    print '______________VALIDATION_______________'
+    print ('______________VALIDATION_______________')
     validation_sample = [x[0] for x in validation]
     validation_answer = [x[1] for x in validation]
     v_predictions = run_test(validation_sample, stats, p_cls)
     get_accuracy(validation_answer, v_predictions)
 
-    print '_________________TEST__________________'
+    print ('_________________TEST__________________')
     t_predictions = run_test(test, stats, p_cls)
     outfile = 'Id,Category\n'
     for i in range(len(t_predictions)):

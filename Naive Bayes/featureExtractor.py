@@ -14,7 +14,7 @@ trainSetYFilename = "train_set_y.csv"
 testFilename = 'test_set_x.csv'
 
 numFeaturesMultiplier = 1
-NUM_SAMPLES = 1000#276516
+NUM_SAMPLES = 276516
 maxNumSamples = NUM_SAMPLES * numFeaturesMultiplier
 
 MIN_GRAM = 1
@@ -85,7 +85,7 @@ def getTrainableData(maxCount=maxNumSamples):
 def generate_freq():
     start_time = time.time()
     tX, tY, numFeatures = getTrainableData()
-    print 'Generate N gram time: ', time.time() - start_time
+    print ('Generate N gram time: ', time.time() - start_time)
     print ("Processed", numFeatures, "entries from the training data.")
     # andrei: u can see the contents of the generated list here
 
@@ -97,8 +97,8 @@ def generate_freq():
         #freq['__CATEGORY__'] = ty
         processed_data.append([freq, ty])
         #total_counter += freq
-    print 'Count ngram time: ', time.time() - start_time
-    print 'len data = ',len(processed_data)
+    print ('Count ngram time: ', time.time() - start_time)
+    print ('len data = ',len(processed_data))
     return processed_data
 
 

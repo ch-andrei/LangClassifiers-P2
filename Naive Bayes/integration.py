@@ -2,23 +2,27 @@ import featureExtractor as fe
 import naive_bayes as nb
 import time
 
+'''
+Parameters to set before start:
+- featureExtractor.py
+    NUM_SAMPLES  -- samples used for traing and validation
+    MIN_GRAM  --  Ngram lower limit
+    MAX_GRAM  --  Ngram upper limit
+- naive_bayes.py
+    VALIDATION_FRAC  --  fraction of NUM_SAMPLES use for validation
+    TOP_N_FEATURE  --  Suggestion: 75. Only use top N features (with high frequency) in each class to avoid overfitting
+    TRIAL  --  Trial number to track test results
+'''
 
 
 # run ngram generator for both training, validation, and test set
-'''
-Remeber! set NUM_SAMPLES, MIN_GRAM, MAX_GRAM parameters in featureExtractor.py
-'''
 data = fe.generate_freq()
 test = fe.getTestData()
 
 # run traing and prediction in Naive Bayes
-'''
-Remeber! set VALIDATION_FRAC, TOP_N_FEATURE, TRIAL in naive_bayes.py
-         set NUM_SAMPLES, MIN_GRAM, MAX_GRAM the same as featureGenerator.py
-'''
 t0 = time.time()
 nb.run_prediction(data, test)
-print 'running time: ', time.time()-t0
+print ('running time: ', time.time()-t0)
 
 
 
