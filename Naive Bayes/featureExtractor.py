@@ -14,7 +14,7 @@ trainSetYFilename = "train_set_y.csv"
 testFilename = 'test_set_x.csv'
 
 numFeaturesMultiplier = 1
-NUM_SAMPLES = 276516
+NUM_SAMPLES = 1000#276516
 maxNumSamples = NUM_SAMPLES * numFeaturesMultiplier
 
 MIN_GRAM = 1

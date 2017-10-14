@@ -6,12 +6,12 @@ import pickle
 import featureExtractor as fe
 
 VALIDATION_FRAC = 0.05
-TOP_N_FEATURE = 1500
+TOP_N_FEATURE = 75
 TRIAL = 2
 
-NUM_SAMPLES = 276516
-MIN_GRAM = 1
-MAX_GRAM = 3
+NUM_SAMPLES = fe.NUM_SAMPLES
+MIN_GRAM = fe.MIN_GRAM
+MAX_GRAM = fe.MAX_GRAM
 
 def split_data(data):
     # random shuffle then split training, validation sets
@@ -43,11 +43,13 @@ def generate_stats(tr):
     print 'Training t1: ', time.time()-t0
     # output of most_common: [('w', 28), ('r', 24)]
     top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
+    features = []
     for x in top_features:
-        print '#', len(x)
-    features = list(set([y[0] for y in x for x in top_features]))
+        print '#feature/class: ', len(x)
+        features += [y[0] for y in x]
+    #print len(features), features[:5]
+    features = list(set(features))
     nfeature = len(features)
-    print features
     print 'number of features: ',nfeature
     t0 = time.time()
     for cls in classes:
@@ -118,6 +120,7 @@ def run_prediction(data, test):
     stats, p_cls = generate_stats(train)
     print 'Traing time: ', time.time()-start_time
 
+    print '______________VALIDATION_______________'
     validation_sample = [x[0] for x in validation]
     validation_answer = [x[1] for x in validation]
     v_predictions = run_test(validation_sample, stats, p_cls)
