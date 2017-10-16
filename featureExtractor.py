@@ -20,43 +20,62 @@ else:
     numProcesses = max(1, int(mp.cpu_count() / 2)) # will use only half of the available CPUs
 
 minLinesPerProcess = 1024 # if less than this, will only use 1 CPU
-maxLinesBeforeDictIsEmptied = 4096 # will build dictionaries in increments of this
+maxLinesBeforeDictIsEmptied = 4096 # will build dictionaries in increments of this # RAM saver
 
 ########################################################################################################################
 
 forceBuildNewDictionary = False
-dictionaryPickleName = "dictionary.pkl"
+dictionaryDefaultPickleName = "dictionary.pkl"
 
 # training dataset info
 dataFolderName = "data/"
 trainSetXFilename = "train_set_x.csv"
 trainSetYFilename = "train_set_y.csv"
 
-outputFilename = dataFolderName + "languages.json"
-
 languageNames = {0: "slovak", 1: "french", 2: "spanish", 3: "german", 4: "polish"}
 
-numEntriesMult = 1024
-numEntriesBase = 1024
+numEntriesMult = 1
+numEntriesBase = 276516
 maxNumEntries = numEntriesBase * numEntriesMult  # will read up to this many entries in the dataset
 
 # training features extraction parameter
 ngramMin = 1
-ngramMax = 6
+ngramMax = 4
+
+# produces a dictionary in the format:
+# dictionary = {ngram1: [countInLang1, countInLang2, ..., countinLangN], ngram2: {...}, ...}
 
 ########################################################################################################################
+# generic tools
 
-def file_len(fname):
+def fileLinesCount(fname):
     with open(fname, "r", encoding="utf8") as f:
         for i, l in enumerate(f):
             pass
     return i + 1
 
+def getDictionaryName(numLinesParsed, ngramMinCount, ngramMaxCount):
+    return "dict_{}-{}grams_{}Train.pkl".format(ngramMinCount, ngramMaxCount, numLinesParsed)
+
+def checkForExistingDictionary(dictionaryFileName=dictionaryDefaultPickleName):
+    return os.path.isfile(dataFolderName + dictionaryFileName)
+
+def pickleReadOrWriteDictionary(dictionaryFileName=dictionaryDefaultPickleName, dictionary=None):
+    if dictionary == None:
+        if checkForExistingDictionary(dictionaryFileName):
+            with open(dataFolderName + dictionaryFileName, "rb") as f:
+                print("Reading dictionary pickle {}...".format(dataFolderName + dictionaryFileName))
+                return pk.load(f)
+    else:
+        with open(dataFolderName + dictionaryFileName, "wb") as f:
+            print("Dumping dictionary to pickle {}...".format(dataFolderName + dictionaryFileName))
+            pk.dump(dictionary, f)
+
 def getTrainXFileLineCount():
-    return file_len(dataFolderName + trainSetXFilename)
+    return fileLinesCount(dataFolderName + trainSetXFilename)
 
 def getTrainYFileLineCount():
-    return file_len(dataFolderName + trainSetYFilename)
+    return fileLinesCount(dataFolderName + trainSetYFilename)
 
 def getTrainXFile():
     return open(dataFolderName + trainSetXFilename, "r", encoding="utf8")
@@ -64,15 +83,14 @@ def getTrainXFile():
 def getTrainYFile():
     return open(dataFolderName + trainSetYFilename, "r", encoding="utf8")
 
+########################################################################################################################
+
 def processTrainLine(line):
     # assuming line format: "id,value"
     line = line.strip()
     return line.split(',')
 
-def getFrequenciesAsSortedTupleList(frequencies):
-    return sorted(frequencies.items(), key=operator.itemgetter(1), reverse=True)
-
-def processTrainXLine(x):
+def processXLine(x):
     vals = processTrainLine(x)
 
     _ngrams = ng.toCharRangedNgramList(vals[1], ngramMin, ngramMax)
@@ -86,14 +104,14 @@ def processTrainXLine(x):
 
     return ngrams
 
-def processTrainYLine(y):
+def processYLine(y):
     # y format: "id, class"
     vals = processTrainLine(y)
     return int(vals[1])
 
 def processAddToDictionary(dictionary, x, y):
-    ngrams = processTrainXLine(x)
-    label = processTrainYLine(y)
+    ngrams = processXLine(x)
+    label = processYLine(y)
 
     for ngram, count in ngrams.items():
         if ngram in dictionary:
@@ -152,29 +170,30 @@ def getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, sta
 def dataProcessTask(q, qCounts, i, num, leftover=0):
     process_startCount = i * num
 
-    print("process", i, "working on", num, "lines, starting at", process_startCount)
+    print("Process", i, "working on", num, "lines, starting at", process_startCount)
 
     numLinesProcessed = getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=num + leftover, startCount=process_startCount)
 
-    print("process", i, "got ", numLinesProcessed, "lines.")
+    print("Process", i, "finished ", numLinesProcessed, "lines.")
 
-def main():
+def generateDictionary():
+    maxLines = maxNumEntries
+    totalLines = getTrainXFileLineCount() # - 1
+    if (maxNumEntries > totalLines):
+        maxLines = totalLines
+
+    dictionaryFileName = getDictionaryName(maxLines, ngramMin, ngramMax)
 
     loadedDictionaryFromDisk = False
     dictionary = None
-    if checkForExistingDictionary() and not forceBuildNewDictionary:
-        dictionary = pickleReadOrWriteDictionary()
+    if not forceBuildNewDictionary and checkForExistingDictionary(dictionaryFileName):
+        dictionary = pickleReadOrWriteDictionary(dictionaryFileName)
         loadedDictionaryFromDisk = True
     else:
         global numProcesses
 
         q = mp.Manager().Queue()
         qCounts = mp.Manager().Queue()
-
-        maxLines = maxNumEntries
-        totalLines = getTrainXFileLineCount()
-        if (maxNumEntries > totalLines):
-            maxLines = totalLines
 
         countPerProcess = int(maxLines / numProcesses)
         if (countPerProcess < minLinesPerProcess):
@@ -187,7 +206,6 @@ def main():
                 processes.append(Process(target=dataProcessTask, args=(q, qCounts, i, countPerProcess)))
             else:
                 leftover = maxLines - countPerProcess * numProcesses
-                print("leftover", leftover)
                 processes.append(Process(target=dataProcessTask, args=(q, qCounts, i, countPerProcess, leftover)))
             processes[i].start()
 
@@ -196,10 +214,13 @@ def main():
 
         del processes
 
-        totalLinesProcessed = 0
+        print ("########################################")
+        print ("Collecting the generated dictionaries...")
+
+        dictCount = 0
+        totalDictCount = q.qsize()
         dictionary = {}
         while not q.empty():
-            print("getting an item from queue...")
             dict = q.get_nowait()
             for ngram, counts in dict.items():
                 if ngram in dictionary:
@@ -207,12 +228,24 @@ def main():
                 else:
                     dictionary[ngram] = counts
 
+            dictCount += 1
+            print("\rProcessed {}/{} dictionaries.".format(dictCount, totalDictCount), end=" ")
+
+        totalLinesProcessed = 0
         while not qCounts.empty():
             totalLinesProcessed += qCounts.get_nowait()
 
+        print("Merge complete.")
         del q, qCounts
 
-    print("computing statistics...")
+    if dictionary == None:
+        print ("Could not generate or read a dictionary... Exiting.")
+    elif loadedDictionaryFromDisk:
+        print ("Loaded dictionary from disk.")
+    else:
+        print ("Generated new dictionary.")
+
+    print("Computing statistics...")
     # compute some statistics
     uniqueCount = 0
     totalCount = 0
@@ -229,25 +262,68 @@ def main():
     print (counts)
     print ("totalCount", totalCount, ", uniqueCount", uniqueCount, ", uniqueness ratio ", uniqueCount/totalCount)
 
-    # for languageName, languageNgrams in languages.items():
-    #     print (languageName)
-    #     print (getFrequenciesAsSortedTupleList(languageNgrams)[:100])
-
     if not loadedDictionaryFromDisk:
-        pickleReadOrWriteDictionary(dictionary)
+        pickleReadOrWriteDictionary(dictionaryFileName, dictionary)
 
-def checkForExistingDictionary():
-    return os.path.isfile(dataFolderName + dictionaryPickleName)
+    return languageNames, counts, dictionary
 
-def pickleReadOrWriteDictionary(dictionary=None):
-    if dictionary == None:
-        with open(dataFolderName + dictionaryPickleName, "rb") as f:
-            print("Reading dictionary pickle...")
-            return pk.load(f)
+def sortBestFeatures(dictionary):
+    return sorted(dictionary.items(), key=lambda item: ngramImportanceHeuristic(item[0], item[1]), reverse=True)
+
+def ngramImportanceHeuristic(ngram, counts, alpha = 0.1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames)):
+    uniquenessFactor = 1 - uniquenessMeasure(counts, n) * 2 / 3.14
+    lengthFactor = np.sqrt(len(ngram))
+    return np.log(counts.sum()) * (alpha + lengthInfluence * lengthFactor + uniquenessInfluence * uniquenessFactor)
+
+def distanceEuclidean(a, b):
+    return np.sqrt(((a-b)**2).sum())
+
+def cosineAngle(a, b):
+    return a.dot(b) / np.sqrt((a*a).sum() * (b*b).sum())
+
+def uniquenessMeasure(a, n, useCosineAngle=True):
+    b = np.ones(n) / n
+    c = a / a.sum()
+    if useCosineAngle:
+        return cosineAngle(c,b)
     else:
-        with open(dataFolderName + dictionaryPickleName, "wb") as f:
-            print("Dumping dictionary pickle...")
-            pk.dump(dictionary, f)
+        return distanceEuclidean(c, b)
+
+def processDictionaryAsTrainingFeatures():
+    languageNames, counts, dictionary = generateDictionary()
+
+    bestNgrams = sortBestFeatures(dictionary)[:10000]
+
+    del dictionary
+
+    ngramsList = []
+    ngramDict = {}
+    index = 0
+    ngramLangCounts = np.zeros(len(languageNames))
+    for ngram, counts in bestNgrams:
+        # print ("[{}] {}".format(ngram, ngramImportanceHeuristic(ngram, counts)), counts.sum(), counts)
+        ngramsList.append(ngram)
+        ngramDict[ngram] = (counts, index)
+        ngramLangCounts += counts
+        index += 1
+
+    return ngramsList, ngramDict, ngramLangCounts
+
+def vectorizeLine(line, ngrams):
+    _ngrams = processXLine(line)
+
+    vector = np.zeros(len(ngrams), np.uint16)
+
+    for ngram in _ngrams:
+        if ngram in ngrams:
+            vector[ngrams[ngram][1]] += 1
+            print (ngram, ngrams[ngram][1], ngrams[ngram])
+
+    return vector
+
+
+def main():
+    processDictionaryAsTrainingFeatures()
 
 if __name__ == "__main__":
     main()
