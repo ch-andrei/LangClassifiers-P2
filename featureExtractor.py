@@ -1,15 +1,12 @@
-import sys
-import operator
-import os
-
+import sys, operator, os
+import pickle as pk
 import multiprocessing as mp
 from multiprocessing import Process
 
 import numpy as np
+import scipy.sparse as scsp
 
 import ngramGenerator as ng
-
-import pickle as pk
 
 ########################################################################################################################
 
@@ -31,22 +28,36 @@ dictionaryDefaultPickleName = "dictionary.pkl"
 dataFolderName = "data/"
 trainSetXFilename = "train_set_x.csv"
 trainSetYFilename = "train_set_y.csv"
+testSetXFilename = "test_set_x.csv"
 
 languageNames = {0: "slovak", 1: "french", 2: "spanish", 3: "german", 4: "polish"}
 
-numEntriesMult = 1
-numEntriesBase = 276516
-maxNumEntries = numEntriesBase * numEntriesMult  # will read up to this many entries in the dataset
+maxNumEntries = 276516
 
 # training features extraction parameter
 ngramMin = 1
-ngramMax = 4
+ngramMax = 1
 
 # produces a dictionary in the format:
 # dictionary = {ngram1: [countInLang1, countInLang2, ..., countinLangN], ngram2: {...}, ...}
 
 ########################################################################################################################
 # generic tools
+
+def checkForExistingDataFile(filename):
+    return os.path.isfile(dataFolderName + filename)
+
+def pickleReadOrWriteObject(filename=dictionaryDefaultPickleName, object=None):
+    if object == None:
+        if checkForExistingDataFile(filename):
+            with open(dataFolderName + filename, "rb") as f:
+                print("Reading pickle [{}]...".format(dataFolderName + filename))
+                return pk.load(f)
+        return None
+    else:
+        with open(dataFolderName + filename, "wb") as f:
+            print("Dumping to pickle [{}]...".format(dataFolderName + filename))
+            pk.dump(object, f)
 
 def fileLinesCount(fname):
     with open(fname, "r", encoding="utf8") as f:
@@ -57,25 +68,14 @@ def fileLinesCount(fname):
 def getDictionaryName(numLinesParsed, ngramMinCount, ngramMaxCount):
     return "dict_{}-{}grams_{}Train.pkl".format(ngramMinCount, ngramMaxCount, numLinesParsed)
 
-def checkForExistingDictionary(dictionaryFileName=dictionaryDefaultPickleName):
-    return os.path.isfile(dataFolderName + dictionaryFileName)
-
-def pickleReadOrWriteDictionary(dictionaryFileName=dictionaryDefaultPickleName, dictionary=None):
-    if dictionary == None:
-        if checkForExistingDictionary(dictionaryFileName):
-            with open(dataFolderName + dictionaryFileName, "rb") as f:
-                print("Reading dictionary pickle {}...".format(dataFolderName + dictionaryFileName))
-                return pk.load(f)
-    else:
-        with open(dataFolderName + dictionaryFileName, "wb") as f:
-            print("Dumping dictionary to pickle {}...".format(dataFolderName + dictionaryFileName))
-            pk.dump(dictionary, f)
-
 def getTrainXFileLineCount():
     return fileLinesCount(dataFolderName + trainSetXFilename)
 
 def getTrainYFileLineCount():
     return fileLinesCount(dataFolderName + trainSetYFilename)
+
+def getTestXFileLineCount():
+    return fileLinesCount(dataFolderName + testSetXFilename)
 
 def getTrainXFile():
     return open(dataFolderName + trainSetXFilename, "r", encoding="utf8")
@@ -83,7 +83,19 @@ def getTrainXFile():
 def getTrainYFile():
     return open(dataFolderName + trainSetYFilename, "r", encoding="utf8")
 
+def getTestXFile():
+    return open(dataFolderName + testSetXFilename, "r", encoding="utf8")
+
 ########################################################################################################################
+
+def getTrainClassWeights(labels):
+    trainYCounts = np.zeros(len(languageNames), np.uint32)
+    for label in labels:
+        try:
+            trainYCounts[label] += 1
+        except:
+            continue
+    return trainYCounts
 
 def processTrainLine(line):
     # assuming line format: "id,value"
@@ -120,7 +132,7 @@ def processAddToDictionary(dictionary, x, y):
             dictionary[ngram] = np.zeros(len(languageNames), np.uint32)
             dictionary[ngram][label] = count
 
-def getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
+def processTrainingDataToDictionary(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
     dictionary = {}
 
     # read files
@@ -139,7 +151,7 @@ def getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, sta
                 skipCount += 1
             except StopIteration:
                 # end of file
-                return
+                break
 
         for _tXval, _tYval in zip(tXfile, tYfile):
             try:
@@ -156,7 +168,7 @@ def getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, sta
                 continue
             except StopIteration:
                 # end of file
-                return
+                break
 
             if lineCount % maxLinesBeforeDictIsEmptied == 0:
                 print (lineCount)
@@ -167,16 +179,16 @@ def getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, sta
 
     return lineCount
 
-def dataProcessTask(q, qCounts, i, num, leftover=0):
+def processTrainingDataToDictionaryTask(q, qCounts, i, num, leftover=0):
     process_startCount = i * num
 
     print("Process", i, "working on", num, "lines, starting at", process_startCount)
 
-    numLinesProcessed = getTrainableData(q, maxTotalCount=maxNumEntries, maxCount=num + leftover, startCount=process_startCount)
+    numLinesProcessed = processTrainingDataToDictionary(q, maxTotalCount=maxNumEntries, maxCount=num + leftover, startCount=process_startCount)
 
     print("Process", i, "finished ", numLinesProcessed, "lines.")
 
-def generateDictionary():
+def generateDictionary(force_recompute=forceBuildNewDictionary):
     maxLines = maxNumEntries
     totalLines = getTrainXFileLineCount() # - 1
     if (maxNumEntries > totalLines):
@@ -186,11 +198,13 @@ def generateDictionary():
 
     loadedDictionaryFromDisk = False
     dictionary = None
-    if not forceBuildNewDictionary and checkForExistingDictionary(dictionaryFileName):
-        dictionary = pickleReadOrWriteDictionary(dictionaryFileName)
+    if not force_recompute and checkForExistingDataFile(dictionaryFileName):
+        dictionary = pickleReadOrWriteObject(dictionaryFileName)
         loadedDictionaryFromDisk = True
     else:
         global numProcesses
+
+        print("Recomputing dictionary...")
 
         q = mp.Manager().Queue()
         qCounts = mp.Manager().Queue()
@@ -203,10 +217,10 @@ def generateDictionary():
         processes = []
         for i in range(numProcesses):
             if (i < numProcesses - 1):
-                processes.append(Process(target=dataProcessTask, args=(q, qCounts, i, countPerProcess)))
+                processes.append(Process(target=processTrainingDataToDictionaryTask, args=(q, qCounts, i, countPerProcess)))
             else:
                 leftover = maxLines - countPerProcess * numProcesses
-                processes.append(Process(target=dataProcessTask, args=(q, qCounts, i, countPerProcess, leftover)))
+                processes.append(Process(target=processTrainingDataToDictionaryTask, args=(q, qCounts, i, countPerProcess, leftover)))
             processes[i].start()
 
         for i in range(numProcesses):
@@ -263,12 +277,102 @@ def generateDictionary():
     print ("totalCount", totalCount, ", uniqueCount", uniqueCount, ", uniqueness ratio ", uniqueCount/totalCount)
 
     if not loadedDictionaryFromDisk:
-        pickleReadOrWriteDictionary(dictionaryFileName, dictionary)
+        pickleReadOrWriteObject(dictionaryFileName, dictionary)
 
     return languageNames, counts, dictionary
 
-def sortBestFeatures(dictionary):
-    return sorted(dictionary.items(), key=lambda item: ngramImportanceHeuristic(item[0], item[1]), reverse=True)
+def readRawTrainingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
+    rawtX = []
+    tY = []
+
+    # read files
+    lineCount = 0
+    with getTrainXFile() as tXfile, getTrainYFile() as tYfile:
+
+        # skip the header line
+        next(tXfile)
+        next(tYfile)
+
+        skipCount = 0
+        while (skipCount < startCount):
+            try:
+                next(tXfile)
+                next(tYfile)
+                skipCount += 1
+            except StopIteration:
+                # end of file
+                break
+
+        for tXval, tYval in zip(tXfile, tYfile):
+            try:
+                if lineCount >= maxCount or startCount + lineCount >= maxTotalCount:
+                    # reached max number of features
+                    break
+
+                rawtX.append(tXval)
+                tY.append(processYLine(tYval))
+
+                lineCount += 1
+
+            except ValueError:
+                print("Unexpected error:", sys.exc_info()[0])
+                continue
+            except StopIteration:
+                # end of file
+                break
+
+    return rawtX, tY
+
+def readRawTestingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
+    rawtX = []
+
+    # read files
+    lineCount = 0
+    with getTestXFile() as tXfile:
+
+        # skip the header line
+        next(tXfile)
+
+        skipCount = 0
+        while (skipCount < startCount):
+            try:
+                next(tXfile)
+                skipCount += 1
+            except StopIteration:
+                # end of file
+                break
+
+        for tXval in tXfile:
+            try:
+                if lineCount >= maxCount or startCount + lineCount >= maxTotalCount:
+                    # reached max number of features
+                    break
+
+                rawtX.append(tXval)
+
+                lineCount += 1
+
+            except ValueError:
+                print("Unexpected error:", sys.exc_info()[0])
+                continue
+            except StopIteration:
+                # end of file
+                break
+
+    return rawtX
+
+def sortBestFeatures(dictionary, featureDim):
+    # dictionary {ngram: counts, ...}
+    sortedFeatures = sorted(dictionary.items(), key=lambda item: ngramImportanceHeuristic(item[0], item[1]), reverse=True)
+
+    bestFeatures = []
+    for feature in sortedFeatures:
+        ngram, counts = feature
+        # remove the " " character and ngrams with numbers in them
+        if not any(c.isdigit() for c in ngram) and not ngram == " ":
+            bestFeatures.append(feature)
+
+    return bestFeatures[:featureDim]
 
 def ngramImportanceHeuristic(ngram, counts, alpha = 0.1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames)):
     uniquenessFactor = 1 - uniquenessMeasure(counts, n) * 2 / 3.14
@@ -289,38 +393,64 @@ def uniquenessMeasure(a, n, useCosineAngle=True):
     else:
         return distanceEuclidean(c, b)
 
-def processDictionaryAsTrainingFeatures():
-    languageNames, counts, dictionary = generateDictionary()
+def processDictionaryAsTrainingFeatures(featureDim = 10000, force_recompute_best=False, force_recompute_dict=False):
+    filename = "ngramListDictCounts_{}.pkl".format(featureDim)
 
-    bestNgrams = sortBestFeatures(dictionary)[:10000]
+    ngramListDictCounts = pickleReadOrWriteObject(filename)
 
-    del dictionary
+    if ngramListDictCounts == None or force_recompute_best:
+        print("Recomputing best features...")
 
-    ngramsList = []
-    ngramDict = {}
-    index = 0
-    ngramLangCounts = np.zeros(len(languageNames))
-    for ngram, counts in bestNgrams:
-        # print ("[{}] {}".format(ngram, ngramImportanceHeuristic(ngram, counts)), counts.sum(), counts)
-        ngramsList.append(ngram)
-        ngramDict[ngram] = (counts, index)
-        ngramLangCounts += counts
-        index += 1
+        languageNames, counts, dictionary = generateDictionary(force_recompute=force_recompute_dict)
+
+        bestNgrams = sortBestFeatures(dictionary, featureDim)
+
+        del dictionary
+
+        ngramsList = []
+        ngramDict = {}
+        ngramLangCounts = np.zeros(len(languageNames))
+        for index, (ngram, counts) in enumerate(bestNgrams):
+            # print ("[{}] {}".format(ngram, ngramImportanceHeuristic(ngram, counts)), counts.sum(), counts)
+            ngramsList.append(ngram)
+            ngramDict[ngram] = (counts, index)
+            ngramLangCounts += counts
+
+            ngramListDictCounts = (ngramsList, ngramDict, ngramLangCounts)
+
+        pickleReadOrWriteObject(filename, ngramListDictCounts)
+
+    ngramsList, ngramDict, ngramLangCounts = ngramListDictCounts
 
     return ngramsList, ngramDict, ngramLangCounts
 
-def vectorizeLine(line, ngrams):
-    _ngrams = processXLine(line)
+def vectorizeLines(lines, ngramDict):
+    vectors = []
+    for line in lines:
+        vector = vectorizeLine(line, ngramDict)
+        vectors.append(vector)
+    return vectors
 
-    vector = np.zeros(len(ngrams), np.uint16)
+def vectorizeLine(line, ngramDict):
+    lineNgrams = processXLine(line)
 
-    for ngram in _ngrams:
-        if ngram in ngrams:
-            vector[ngrams[ngram][1]] += 1
-            print (ngram, ngrams[ngram][1], ngrams[ngram])
+    return vectorizeNgrams(lineNgrams, ngramDict)
 
+def vectorizeNgrams(lineNgrams, ngramDict):
+    vector = np.zeros(len(ngramDict), np.float)
+
+    for ngram, count in lineNgrams.items():
+        if ngram in ngramDict:
+            vector[ngramDict[ngram][1]] += count
+
+    # return scsp.csr_matrix(vector)
     return vector
 
+def printNgramVector(vector, ngramsList):
+    print("Printing vector:")
+    _, indices, counts = scsp.find(vector)
+    for index, count in zip(indices, counts):
+        print("[{}]".format(ngramsList[index]), "index", index, "count:", count)
 
 def main():
     processDictionaryAsTrainingFeatures()
