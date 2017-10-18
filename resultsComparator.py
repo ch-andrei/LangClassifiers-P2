@@ -3,7 +3,7 @@ import numpy as np
 import os
 from os.path import isfile, join
 
-outputFilename = "result_merged"
+outputFilenamePrefix = "result_merged"
 folder = "data/outputs/"
 predictCount = 118508
 
@@ -12,9 +12,7 @@ def estimateWeights(ps, Epsilon=0):
     weights = ps / d2p
     return weights / weights.sum() # normalized
 
-def mergeResults():
-    filenames = [f for f in os.listdir(folder) if isfile(join(folder, f)) and f.__contains__(".csv")]
-
+def mergeResults(filenames):
     print(filenames)
 
     weights = np.zeros(len(filenames))
@@ -40,7 +38,7 @@ def mergeResults():
                 except StopIteration:
                     break
 
-    with open("{}-{}.csv".format(outputFilename, len(filenames)), "w") as outputFile:
+    with open("{}-{}.csv".format(outputFilenamePrefix, len(filenames)), "w") as outputFile:
         outputFile.write("Id,Category\n")
         for i in range(predictCount):
             predict = probabilities[i].argmax()
@@ -61,11 +59,19 @@ def compare(filename1, filename2):
             total += 1
             if not y1 == y2:
                 mistmatch += 1
-        print(mistmatch, total, "ratio:", mistmatch / total)
+        print("ratio:", mistmatch / total, filename1, "vs", filename2, mistmatch, total)
 
 def main():
-    mergeResults()
-    # compare("{}-7.csv".format(outputFilename), folder + "test_result_7.csv")
+    filenames = [f for f in os.listdir(folder) if isfile(join(folder, f)) and f.__contains__(".csv")]
+    # mergeResults(filenames)
+    # outputFilename = "{}-{}.csv".format(outputFilenamePrefix, len(filenames))
+    for file1 in filenames:
+        for file2 in filenames:
+            if not file1 == file2:
+                print("\n", file1, "vs", file2,)
+                compare(folder + file1, folder + file2)
+
+    # compare('AB-RF_1-1grams_128n-est_16RF-n-est_0.01learnRate_500001train-size.csv', 'AB-SGD_1-1grams_128n-est_512RF-n-est_0.01learnRate_500001train-size.csv')
 
 if __name__=="__main__":
     main()

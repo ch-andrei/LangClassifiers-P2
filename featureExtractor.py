@@ -21,18 +21,22 @@ maxLinesBeforeDictIsEmptied = 4096 # will build dictionaries in increments of th
 
 ########################################################################################################################
 
-forceBuildNewDictionary = False
+forceBuildNewDictionary = True
+forceBuildNewBestDictionary = True
+
 dictionaryDefaultPickleName = "dictionary.pkl"
 
 # training dataset info
 dataFolderName = "data/"
-trainSetXFilename = "train_set_x.csv"
-trainSetYFilename = "train_set_y.csv"
+trainSetXFilename = "generatedTestSetX-500000.csv"
+trainSetYFilename = "generatedTestSetY-500000.csv"
+fakeTrainSetXFilename = "generatedTestSetX-100000.csv"
+fakeTrainSetYFilename = "generatedTestSetY-100000.csv"
 testSetXFilename = "test_set_x.csv"
 
 languageNames = {0: "slovak", 1: "french", 2: "spanish", 3: "german", 4: "polish"}
 
-maxNumEntries = 276516
+maxNumEntries = 500000
 
 # training features extraction parameter
 ngramMin = 1
@@ -68,7 +72,9 @@ def fileLinesCount(fname):
 def getDictionaryName(numLinesParsed, ngramMinCount, ngramMaxCount):
     return "dict_{}-{}grams_{}Train.pkl".format(ngramMinCount, ngramMaxCount, numLinesParsed)
 
-def getTrainXFileLineCount():
+def getTrainXFileLineCount(useFakeTrainSet=False):
+    if useFakeTrainSet:
+        return fileLinesCount(dataFolderName + fakeTrainSetXFilename)
     return fileLinesCount(dataFolderName + trainSetXFilename)
 
 def getTrainYFileLineCount():
@@ -76,6 +82,17 @@ def getTrainYFileLineCount():
 
 def getTestXFileLineCount():
     return fileLinesCount(dataFolderName + testSetXFilename)
+
+def getTrainFiles(useFakeTrainSet=False):
+    if useFakeTrainSet:
+        return getFakeTrainXFile(), getFakeTrainYFile()
+    return getTrainXFile(), getTrainYFile()
+
+def getFakeTrainXFile():
+    return open(dataFolderName + fakeTrainSetXFilename, "r", encoding="utf8")
+
+def getFakeTrainYFile():
+    return open(dataFolderName + fakeTrainSetYFilename, "r", encoding="utf8")
 
 def getTrainXFile():
     return open(dataFolderName + trainSetXFilename, "r", encoding="utf8")
@@ -109,6 +126,8 @@ def processXLine(x):
 
     ngrams = {}
     for ngram in _ngrams:
+        if " " in ngram:
+            continue
         if not ngram in ngrams:
             ngrams[ngram] = 1
         else:
@@ -190,7 +209,7 @@ def processTrainingDataToDictionaryTask(q, qCounts, i, num, leftover=0):
 
 def generateDictionary(force_recompute=forceBuildNewDictionary):
     maxLines = maxNumEntries
-    totalLines = getTrainXFileLineCount() # - 1
+    totalLines = getTrainXFileLineCount()
     if (maxNumEntries > totalLines):
         maxLines = totalLines
 
@@ -198,7 +217,7 @@ def generateDictionary(force_recompute=forceBuildNewDictionary):
 
     loadedDictionaryFromDisk = False
     dictionary = None
-    if not force_recompute and checkForExistingDataFile(dictionaryFileName):
+    if not force_recompute:
         dictionary = pickleReadOrWriteObject(dictionaryFileName)
         loadedDictionaryFromDisk = True
     else:
@@ -263,6 +282,7 @@ def generateDictionary(force_recompute=forceBuildNewDictionary):
     # compute some statistics
     uniqueCount = 0
     totalCount = 0
+    count = 0
     counts = np.zeros(5, np.uint32)
     for ngram, _counts in dictionary.items():
         totalCount += _counts.sum()
@@ -271,55 +291,59 @@ def generateDictionary(force_recompute=forceBuildNewDictionary):
         unique = len(np.where(_counts > 0)[0]) == 1
         if unique:
             uniqueCount += 1
+        count += 1
 
     print (languageNames)
     print (counts)
-    print ("totalCount", totalCount, ", uniqueCount", uniqueCount, ", uniqueness ratio ", uniqueCount/totalCount)
+    print ("totalCount", totalCount, "; countNgrams", count, ", uniqueCount", uniqueCount, ", uniqueness ratio ", uniqueCount/count)
 
     if not loadedDictionaryFromDisk:
         pickleReadOrWriteObject(dictionaryFileName, dictionary)
 
     return languageNames, counts, dictionary
 
-def readRawTrainingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
+def readRawTrainingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0, useFakeTrainSet=False):
     rawtX = []
     tY = []
 
     # read files
     lineCount = 0
-    with getTrainXFile() as tXfile, getTrainYFile() as tYfile:
+    tXfile, tYfile = getTrainFiles(useFakeTrainSet)
 
-        # skip the header line
-        next(tXfile)
-        next(tYfile)
+    # skip the header line
+    next(tXfile)
+    next(tYfile)
 
-        skipCount = 0
-        while (skipCount < startCount):
-            try:
-                next(tXfile)
-                next(tYfile)
-                skipCount += 1
-            except StopIteration:
-                # end of file
+    skipCount = 0
+    while (skipCount < startCount):
+        try:
+            next(tXfile)
+            next(tYfile)
+            skipCount += 1
+        except StopIteration:
+            # end of file
+            break
+
+    for tXval, tYval in zip(tXfile, tYfile):
+        try:
+            if lineCount >= maxCount or startCount + lineCount >= maxTotalCount:
+                # reached max number of features
                 break
 
-        for tXval, tYval in zip(tXfile, tYfile):
-            try:
-                if lineCount >= maxCount or startCount + lineCount >= maxTotalCount:
-                    # reached max number of features
-                    break
+            rawtX.append(tXval)
+            tY.append(processYLine(tYval))
 
-                rawtX.append(tXval)
-                tY.append(processYLine(tYval))
+            lineCount += 1
 
-                lineCount += 1
+        except ValueError:
+            print("Unexpected error:", sys.exc_info()[0])
+            continue
+        except StopIteration:
+            # end of file
+            break
 
-            except ValueError:
-                print("Unexpected error:", sys.exc_info()[0])
-                continue
-            except StopIteration:
-                # end of file
-                break
+    tXfile.close()
+    tYfile.close()
 
     return rawtX, tY
 
@@ -366,11 +390,8 @@ def sortBestFeatures(dictionary, featureDim):
     sortedFeatures = sorted(dictionary.items(), key=lambda item: ngramImportanceHeuristic(item[0], item[1]), reverse=True)
 
     bestFeatures = []
-    for feature in sortedFeatures:
-        ngram, counts = feature
-        # remove the " " character and ngrams with numbers in them
-        if not any(c.isdigit() for c in ngram) and not ngram == " ":
-            bestFeatures.append(feature)
+    for ngram, counts in sortedFeatures:
+        bestFeatures.append((ngram, counts))
 
     return bestFeatures[:featureDim]
 
@@ -393,17 +414,17 @@ def uniquenessMeasure(a, n, useCosineAngle=True):
     else:
         return distanceEuclidean(c, b)
 
-def processDictionaryAsTrainingFeatures(featureDim = 10000, force_recompute_best=False, force_recompute_dict=False):
-    filename = "ngramListDictCounts_{}.pkl".format(featureDim)
+def processDictionaryAsTrainingFeatures(maxFeatureDim=10000, force_recompute_best=forceBuildNewBestDictionary, force_recompute_dict=forceBuildNewDictionary):
+    bestFeaturesDictFilename = "ngramListDictCounts_max{}_{}-{}.pkl".format(maxFeatureDim, ngramMin, ngramMax)
 
-    ngramListDictCounts = pickleReadOrWriteObject(filename)
+    ngramListDictCounts = pickleReadOrWriteObject(bestFeaturesDictFilename)
 
     if ngramListDictCounts == None or force_recompute_best:
         print("Recomputing best features...")
 
         languageNames, counts, dictionary = generateDictionary(force_recompute=force_recompute_dict)
 
-        bestNgrams = sortBestFeatures(dictionary, featureDim)
+        bestNgrams = sortBestFeatures(dictionary, maxFeatureDim)
 
         del dictionary
 
@@ -416,9 +437,9 @@ def processDictionaryAsTrainingFeatures(featureDim = 10000, force_recompute_best
             ngramDict[ngram] = (counts, index)
             ngramLangCounts += counts
 
-            ngramListDictCounts = (ngramsList, ngramDict, ngramLangCounts)
+        ngramListDictCounts = (ngramsList, ngramDict, ngramLangCounts)
 
-        pickleReadOrWriteObject(filename, ngramListDictCounts)
+        pickleReadOrWriteObject(bestFeaturesDictFilename, ngramListDictCounts)
 
     ngramsList, ngramDict, ngramLangCounts = ngramListDictCounts
 
