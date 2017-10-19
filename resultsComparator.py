@@ -38,12 +38,15 @@ def mergeResults(filenames):
                 except StopIteration:
                     break
 
-    with open("{}-{}.csv".format(outputFilenamePrefix, len(filenames)), "w") as outputFile:
+    outputFileName = "{}-{}.csv".format(outputFilenamePrefix, len(filenames))
+    with open(outputFileName, "w") as outputFile:
         outputFile.write("Id,Category\n")
         for i in range(predictCount):
             predict = probabilities[i].argmax()
             line = "{},{}".format(i, predict)
             outputFile.write("{}\n".format(line))
+
+    return outputFileName
 
 def compare(filename1, filename2):
     with open(filename1, "r", encoding="utf8") as f1, open(filename2, "r", encoding="utf8") as f2:
@@ -59,19 +62,30 @@ def compare(filename1, filename2):
             total += 1
             if not y1 == y2:
                 mistmatch += 1
-        print("ratio:", mistmatch / total, filename1, "vs", filename2, mistmatch, total)
+        print("mistamtch %:", 100 * mistmatch / total, filename1, "vs", filename2, mistmatch, total)
+
+def compareAll(filenames):
+    n = len(filenames)
+    p = np.where(np.tril(np.ones((n,n)), -1) > 0)
+
+    for i, j in zip(p[0], p[1]):
+        file1 = filenames[i]
+        file2 = filenames[j]
+        if not file1 == file2:
+            print("\n", file1, "vs", file2,)
+            compare(folder + file1, folder + file2)
+
+def compareOneToAll(file, filenames):
+    for _file in filenames:
+        if not file == _file:
+            compare(file, _file)
 
 def main():
     filenames = [f for f in os.listdir(folder) if isfile(join(folder, f)) and f.__contains__(".csv")]
-    # mergeResults(filenames)
-    # outputFilename = "{}-{}.csv".format(outputFilenamePrefix, len(filenames))
-    for file1 in filenames:
-        for file2 in filenames:
-            if not file1 == file2:
-                print("\n", file1, "vs", file2,)
-                compare(folder + file1, folder + file2)
+    compareAll(filenames)
 
-    # compare('AB-RF_1-1grams_128n-est_16RF-n-est_0.01learnRate_500001train-size.csv', 'AB-SGD_1-1grams_128n-est_512RF-n-est_0.01learnRate_500001train-size.csv')
+    outputFileName = mergeResults(filenames)
+    compareOneToAll(outputFileName, filenames)
 
 if __name__=="__main__":
     main()
