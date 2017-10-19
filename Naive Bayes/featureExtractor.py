@@ -9,16 +9,17 @@ import time
 import ngramGenerator as ng
 
 dataFolderName = "data/"
-trainSetXFilename = "train_set_x.csv"
-trainSetYFilename = "train_set_y.csv"
-testFilename = 'test_set_x.csv'
+trainSetXFilename = "train_set_x_clean.csv"
+trainSetYFilename = "train_set_y_clean.csv"
+testFilename = 'generatedTestSetX-100000.csv'
+#testFilename = 'test_set_x.csv'
 
 numFeaturesMultiplier = 1
-NUM_SAMPLES = 276516
+NUM_SAMPLES = 264655#276516
 maxNumSamples = NUM_SAMPLES * numFeaturesMultiplier
 
 MIN_GRAM = 1
-MAX_GRAM = 3
+MAX_GRAM = 1
 
 def getTrainXFile():
     return open(dataFolderName + trainSetXFilename, "r")#, encoding="utf8")
@@ -70,8 +71,8 @@ def getTrainableData(maxCount=maxNumSamples):
                     # reached max number of features
                     break
 
-                tX.append(processTrainXLine(_tXval))
-                tY.append(processTrainYLine(_tYval))
+                tX.append(processTrainXLine(_tXval.lower()))
+                tY.append(processTrainYLine(_tYval.lower()))
 
                 # TODO
                 # generate ngrams from the cleaned words
@@ -109,7 +110,7 @@ def getTestData():
         next(testfile)
         for _tXval in testfile:
             try:
-                testlines.append(processTrainXLine(_tXval))
+                testlines.append(processTrainXLine(_tXval.lower()))
             except:
                 print("Unexpected error:", sys.exc_info()[0])
     test_freq = []

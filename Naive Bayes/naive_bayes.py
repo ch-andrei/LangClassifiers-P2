@@ -6,8 +6,8 @@ import pickle
 import featureExtractor as fe
 
 VALIDATION_FRAC = 0.05
-TOP_N_FEATURE = 75
-TRIAL = 2
+TOP_N_FEATURE = 100
+TRIAL = 10
 
 NUM_SAMPLES = fe.NUM_SAMPLES
 MIN_GRAM = fe.MIN_GRAM
@@ -26,6 +26,7 @@ def save_obj(obj, name):
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 # get mean and std deviation of each feature upon each class
 def generate_stats(tr):
+    print ('_______________TRAINING________________')
     # stores {class1: {feature1: P1, feature2: P2, ...}, class2: {...},...}
     stats = {}
     # stores sample in class1 / total sample
@@ -33,23 +34,32 @@ def generate_stats(tr):
     # set() returns unique-value list
     classes = list(set([x[1] for x in tr]))
     # get a list of unique features
-    top_features = {cls: Counter() for cls in classes}
-    total_freq_per_class = {cls: 0 for cls in classes}
+    #top_features = {cls: Counter() for cls in classes}
+    total_freq_per_class = {0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}#{cls: 0 for cls in classes}#{0: 2080596, 1: 19590790, 2: 8545051, 3: 5000797, 4: 1625121}
     t0 = time.time()
-    for sample in tr:
-        #features = list(set(features + sample[0].keys()))
-        top_features[sample[1]] += Counter(sample[0])
-        total_freq_per_class[sample[1]] += sum(sample[0].values())
+    #for sample in tr:
+        #top_features[sample[1]] += Counter(sample[0])
+        #total_freq_per_class[sample[1]] += sum(sample[0].values()) #1,2,3grams: {0: 2080596, 1: 19590790, 2: 8545051, 3: 5000797, 4: 1625121}
+    print total_freq_per_class
     print ('Training t1: ', time.time()-t0)
     # output of most_common: [('w', 28), ('r', 24)]
-    top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
+    '''top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
     features = []
     for x in top_features:
-        print ('#feature/class: ', len(x))
+        print ('#feature/class: ', len(x), x)
         features += [y[0] for y in x]
     #print (len(features), features[:5])
     features = list(set(features))
+    print features'''
+    # 93 features features = ['\x87', '\x93', '\x9b', ' ', '\xab', '0', '\xb3', '4', '8', '\xbb', '\xc3', 'D', 'H', 'L', 'P', 'T', 'X', 'd', 'h', 'l', 'p', 't', 'x', '\x80', '\x84', '\x94', '\x98', '\x9c', '3', '7', '\xbc', 'C', '\xc4', 'G', 'K', 'O', 'S', 'W', 'c', 'g', 'k', 'o', 's', 'w', '\x81', '\x85', '\x99', '\x9d', '\xa1', '\xa9', '\xb1', '2', '6', '\xb9', '\xbd', 'B', '\xc5', 'F', 'J', 'N', 'R', 'V', 'Z', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x9a', '\x9e', '\xa6', '1', '5', '9', '\xba', 'A', '\xc2', 'E', 'I', 'M', 'U', 'Y', 'a', '\xe2', 'e', 'i', 'm', 'u', 'y']
+    #features = ['\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', ' ', '\xa3', '\xa7', '\xab', '\xaf', '0', '\xb3', '4', '\xb7', '8', '\xbb', '\xbf', '\xc3', '\xcb', '\xcf', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '3', '\xb4', '7', '\xb8', '\xbc', '\xc4', '\xcc', '\xd0', '\xe0', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '2', '\xb5', '6', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '1', '\xb2', '5', '\xb6', '9', '\xba', '\xbe', '\xc2', '\xc6', '\xca', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
+
+    # feture with no numbers and space
+    #features = ['\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', '\xa3', '\xa7', '\xab', '\xaf', '\xb3', '\xb7', '\xbb', '\xbf', '\xc3', '\xcb', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '\xb4', '\xb8', '\xbc', '\xc4', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '\xb5', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '\xb2', '\xb6', '\xba', '\xbe', '\xc2', '\xc6', '\xca', '\xce', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
+    # feature with numbers
+    features = ['0','1','2','3','4','5','6','7','8','9','\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', '\xa3', '\xa7', '\xab', '\xaf', '\xb3', '\xb7', '\xbb', '\xbf', '\xc3', '\xcb', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '\xb4', '\xb8', '\xbc', '\xc4', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '\xb5', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '\xb2', '\xb6', '\xba', '\xbe', '\xc2', '\xc6', '\xca', '\xce', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
     nfeature = len(features)
+    #print features
     print ('number of features: ',nfeature)
     t0 = time.time()
     for cls in classes:
@@ -61,9 +71,10 @@ def generate_stats(tr):
             for sample in docs_in_cls:
                 if feature in sample.keys():
                     feature_in_cls += sample[feature]
-            stats[cls][feature] = float(1 + feature_in_cls)/(nfeature + total_freq_per_class[cls])
+            #stats[cls][feature] = float(1 + feature_in_cls)/(nfeature + total_freq_per_class[cls])
+            stats[cls][feature] = float(1 + feature_in_cls) / (2 + total_freq_per_class[cls])
     print ('Training t2: ', time.time()-t0)
-    save_obj(stats, 'model_{}-{}gram_{}Train_{}Feature'.format(MIN_GRAM, MAX_GRAM,NUM_SAMPLES,TOP_N_FEATURE))
+    save_obj(stats, 'model_{}-{}gram_{}Train_{}Feature_alg2'.format(MIN_GRAM, MAX_GRAM,NUM_SAMPLES,nfeature))
     return stats, p_cls
 
 

@@ -1,7 +1,7 @@
 import featureExtractor as fe
 import naive_bayes as nb
 import time
-
+import pandas as pd
 '''
 Parameters to set before start:
 - featureExtractor.py
@@ -19,10 +19,19 @@ Parameters to set before start:
 data = fe.generate_freq()
 test = fe.getTestData()
 
+
 # run traing and prediction in Naive Bayes
 t0 = time.time()
 nb.run_prediction(data, test)
 print ('running time: ', time.time()-t0)
 
 
+# get accuracy
+dft = pd.read_csv('C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\\test_result_10.csv')
+dfa = pd.read_csv('C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\data\generatedTestSetY-100000.csv')
+
+dfr = dft.merge(dfa, on='Id',how='left')
+print dfr.head()
+dfr['result'] = dfr.Category_x == dfr.Category_y
+print float(len(dfr[dfr.result==True]))/len(dfr), len(dfr[dfr.result==True])
 

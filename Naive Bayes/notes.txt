@@ -1,0 +1,85 @@
+# fake set
+
+# no number and space features
+('Generate N gram time: ', 35.668999910354614)
+('Processed', 264655, 'entries from the training data.')
+('Count ngram time: ', 24.83400011062622)
+('len data = ', 264655)
+Dataset split into training 251423, validation 13232
+_______________TRAINING________________
+{0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}
+('Training t1: ', 0.0)
+('number of features: ', 102)
+('Training t2: ', 81.64400005340576)
+('Traing time: ', 81.90599989891052)
+______________VALIDATION_______________
+('Testing time: ', 13.636000156402588)
+('Accuracy: ', 87.87031438935912, '%')
+_________________TEST__________________
+('Testing time: ', 69.9009997844696)
+('running time: ', 166.7519998550415)
+   Id  Category_x  Category_y
+0   0           1           1
+1   1           1           3
+2   2           1           4
+3   3           1           1
+4   4           1           1
+0.77744 77744
+
+
+# no number, with space
+('Generate N gram time: ', 30.60800004005432)
+('Processed', 264655, 'entries from the training data.')
+('Count ngram time: ', 23.32100009918213)
+('len data = ', 264655)
+Dataset split into training 251423, validation 13232
+_______________TRAINING________________
+{0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}
+('Training t1: ', 0.0)
+('number of features: ', 103)
+('Training t2: ', 84.17899990081787)
+('Traing time: ', 84.41100001335144)
+______________VALIDATION_______________
+('Testing time: ', 12.878000020980835)
+('Accuracy: ', 87.613361547763, '%')
+_________________TEST__________________
+('Testing time: ', 67.13900017738342)
+('running time: ', 165.67900013923645)
+   Id  Category_x  Category_y
+0   0           1           1
+1   1           1           3
+2   2           1           4
+3   3           1           1
+4   4           1           1
+0.77094 77094
+
+
+# feature with numbers, not space
+('Generate N gram time: ', 30.081000089645386)
+('Processed', 264655, 'entries from the training data.')
+('Count ngram time: ', 21.05299997329712)
+('len data = ', 264655)
+Dataset split into training 251423, validation 13232
+_______________TRAINING________________
+{0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}
+('Training t1: ', 0.0)
+('number of features: ', 112)
+('Training t2: ', 86.38700008392334)
+('Traing time: ', 86.56599998474121)
+______________VALIDATION_______________
+('Testing time: ', 15.103000164031982)
+('Accuracy: ', 87.93833131801692, '%')
+_________________TEST__________________
+('Testing time: ', 76.53800010681152)
+('running time: ', 179.90500020980835)
+   Id  Category_x  Category_y
+0   0           1           1
+1   1           1           3
+2   2           1           4
+3   3           1           1
+4   4           1           1
+0.78229 78229
+
+
+# smoothing 1/2 instead of 1/#features
+
