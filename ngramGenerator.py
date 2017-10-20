@@ -58,4 +58,3 @@ def toCharNgramList(word, n):
         ngrams.append(ngram)
 
     return ngrams
-
