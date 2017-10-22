@@ -21,35 +21,41 @@ maxLinesBeforeDictIsEmptied = 4096 # will build dictionaries in increments of th
 ########################################################################################################################
 
 forceBuildNewDictionary = True
-forceBuildNewBestDictionary = True
+forceBuildNewBestDictionary = forceBuildNewDictionary or True
+
+########################################################################################################################
 
 dictionaryDefaultPickleName = "dictionary.pkl"
 
 # training dataset info
 dataFolderName = "data/"
-trainSetXFilename = "_train_set_x.csv"
-trainSetYFilename = "_train_set_y.csv"
+trainSetXFilename = "mergedDatasetX.csv"
+trainSetYFilename = "mergedDatasetY.csv"
 # trainSetXFilename = "generatedTestSetX-500000.csv"
 # trainSetYFilename = "generatedTestSetY-500000.csv"
+
+# test data set
 fakeTrainSetXFilename = "generatedTestSetX-100000.csv"
 fakeTrainSetYFilename = "generatedTestSetY-100000.csv"
 testSetXFilename = "test_set_x.csv"
 
-languageNames = {0: "slovak", 1: "french", 2: "spanish", 3: "german", 4: "polish"}
+maxNumEntries = 500000 # maximum number of lines to read
 
-maxNumEntries = 500000
+########################################################################################################################
+
+languageNames = {0: "slovak", 1: "french", 2: "spanish", 3: "german", 4: "polish"}
 
 # training features extraction parameter
 ngramMin = 1
 ngramMax = 1
 
-MAX_FEATURE_DIM=1000
+MAX_FEATURE_DIM=1000 # up to how many feature to keep
 
 # produces a dictionary in the format:
 # dictionary = {ngram1: [countInLang1, countInLang2, ..., countinLangN], ngram2: {...}, ...}
 
 ########################################################################################################################
-# generic tools
+# generic helper functions
 
 def checkForExistingDataFile(filename):
     return os.path.isfile(dataFolderName + filename)
@@ -108,6 +114,7 @@ def getTestXFile():
 
 ########################################################################################################################
 
+# given a list of labels, count the distribution of labels
 def getTrainClassWeights(labels):
     trainYCounts = np.zeros(len(languageNames), np.uint32)
     for label in labels:
@@ -119,10 +126,11 @@ def getTrainClassWeights(labels):
 
 def processTrainLine(line):
     # assuming line format: "id,value"
-    line = line.replace(" ", "")
     line = line.strip()
+    line = line.replace(" ", "")
     return line.split(',')
 
+# compute ngrams for an x line
 def processXLine(x):
     vals = processTrainLine(x)
 
@@ -137,11 +145,13 @@ def processXLine(x):
 
     return ngrams
 
+# get the label value
 def processYLine(y):
     # y format: "id, class"
     vals = processTrainLine(y)
     return int(vals[1])
 
+# process an X-Y line pair and add resulting ngrams to an existing dictionary
 def processAddToDictionary(dictionary, x, y):
     ngrams = processXLine(x)
     label = processYLine(y)
@@ -153,6 +163,8 @@ def processAddToDictionary(dictionary, x, y):
             dictionary[ngram] = np.zeros(len(languageNames), np.uint32)
             dictionary[ngram][label] = count
 
+# read the training data files, add processed ngrams to dictionary, append dictionary to a queue
+# queue is used for thread synchronization issues
 def processTrainingDataToDictionary(q, maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
     dictionary = {}
 
@@ -200,6 +212,7 @@ def processTrainingDataToDictionary(q, maxTotalCount=maxNumEntries, maxCount=max
 
     return lineCount
 
+# function to process train files by a Python process
 def processTrainingDataToDictionaryTask(q, qCounts, i, num, leftover=0):
     process_startCount = i * num
 
@@ -209,6 +222,7 @@ def processTrainingDataToDictionaryTask(q, qCounts, i, num, leftover=0):
 
     print("Process", i, "finished ", numLinesProcessed, "lines.")
 
+# generates a dictionary or reads it from a.pkl file provided one was previously generated
 def generateDictionary(force_recompute=forceBuildNewDictionary):
     maxLines = maxNumEntries
     totalLines = getTrainXFileLineCount()
@@ -304,6 +318,7 @@ def generateDictionary(force_recompute=forceBuildNewDictionary):
 
     return languageNames, counts, dictionary
 
+# read TRAINING x,y lines without processing (simply makes lists of X and Y entries) # repeating code for lack of time
 def readRawTrainingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0, useFakeTrainSet=False):
     rawtX = []
     tY = []
@@ -349,6 +364,7 @@ def readRawTrainingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, st
 
     return rawtX, tY
 
+# read TESTING x lines without processing (simply makes a list of X entries) # repeating code for lack of time
 def readRawTestingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, startCount=0):
     rawtX = []
 
@@ -387,6 +403,8 @@ def readRawTestingLines(maxTotalCount=maxNumEntries, maxCount=maxNumEntries, sta
 
     return rawtX
 
+# sorts dictionary to a list of tuples in descending order of ngram importance (best first)
+# returns up to featureDim best ngrams (throws away the rest)
 def sortBestFeatures(dictionary, featureDim):
     # dictionary {ngram: counts, ...}
     sortedFeatures = sorted(dictionary.items(), key=lambda item: ngramImportanceHeuristic(item[0], item[1]), reverse=True)
@@ -397,16 +415,14 @@ def sortBestFeatures(dictionary, featureDim):
 
     return bestFeatures[:featureDim]
 
+# estimates ngrams importance based on its length and uniqueness
 def ngramImportanceHeuristic(ngram, counts, alpha = 1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames), scaleByCounts=True):
-    uniquenessFactor = 1 - uniquenessMeasure(counts, n) * 2 / 3.14
+    uniquenessFactor = 1 - uniquenessMeasure(counts, n)
     lengthFactor = np.sqrt(len(ngram))
     h = lengthInfluence * lengthFactor + uniquenessInfluence * uniquenessFactor
     if scaleByCounts:
         h *= (alpha + np.log(counts.sum()))
     return h
-
-def vectorNgramImportanceHeuristic(ngram, counts):
-    return ngramImportanceHeuristic(ngram, counts, alpha=1, lengthInfluence=0, uniquenessInfluence=100, scaleByCounts=True)
 
 def distanceEuclidean(a, b):
     return np.sqrt(((a-b)**2).sum())
@@ -414,15 +430,22 @@ def distanceEuclidean(a, b):
 def cosineAngle(a, b):
     return a.dot(b) / np.sqrt((a*a).sum() * (b*b).sum())
 
+# estimates the uniquness of an ngram based on the distance of its counts vector to the least unique vector
+# ex: for 2-dimension: [1,1] is the direction of the least unique vector, [0,1] and [1,0] are the most unique vectors
 def uniquenessMeasure(a, n, useCosineAngle=True):
     b = np.ones(n) / np.sqrt(n)
     c = a / a.sum()
     if useCosineAngle:
-        return cosineAngle(c,b)
+        return cosineAngle(c,b) * 2 / 3.14
     else:
         return distanceEuclidean(c, b)
 
-def processDictionaryAsTrainingFeatures(maxFeatureDim=MAX_FEATURE_DIM, force_recompute_best=forceBuildNewBestDictionary, force_recompute_dict=forceBuildNewDictionary):
+# read or generate a dictionary given the training files
+# returns a tuple representing:
+# (a list of best ngrams, ngram dictionary {ngram: counts}, total ngram counts for each language)
+def processDictionaryAsTrainingFeatures(maxFeatureDim=MAX_FEATURE_DIM,
+                                        force_recompute_best=forceBuildNewBestDictionary,
+                                        force_recompute_dict=forceBuildNewDictionary):
     bestFeaturesDictFilename = "ngramListDictCounts_max{}_{}-{}.pkl".format(maxFeatureDim, ngramMin, ngramMax)
 
     ngramListDictCounts = pickleReadOrWriteObject(bestFeaturesDictFilename)
@@ -456,6 +479,7 @@ def processDictionaryAsTrainingFeatures(maxFeatureDim=MAX_FEATURE_DIM, force_rec
 
     return ngramsList, ngramDict, ngramLangCounts
 
+# returns a list of vectors representing raw X lines given an ngram dictionary
 def vectorizeLines(lines, ngramDict):
     vectors = []
     for line in lines:
@@ -463,12 +487,10 @@ def vectorizeLines(lines, ngramDict):
         vectors.append(vector)
     return vectors
 
+# returns a vector representing a single line given an ngram dictionary
 def vectorizeLine(line, ngramDict):
     lineNgrams = processXLine(line)
 
-    return vectorizeNgrams(lineNgrams, ngramDict)
-
-def vectorizeNgrams(lineNgrams, ngramDict):
     vector = np.zeros(len(ngramDict), np.float32)
 
     ngrams = []
@@ -477,12 +499,9 @@ def vectorizeNgrams(lineNgrams, ngramDict):
             ngrams.append(ngram)
             vector[ngramDict[ngram][1]] += count
 
-    # # scale by importance heuristic
-    # for ngram in ngrams:
-    #     vector[ngramDict[ngram][1]] *= vectorNgramImportanceHeuristic(ngram, ngramDict[ngram][0])
-
     return vector
 
+# call to generate the dictionary and the best features (saves to .pkl files)
 def main():
     processDictionaryAsTrainingFeatures()
 

@@ -1,5 +1,7 @@
 import numpy as np
 
+# note that all computations are done on numpy arrays and not single values
+# thus the probabilities are compute for each language in matrix form (vectorized with numpy)
 class NaiveBayesClassifier:
     def __init__(self, ngramsList, ngramDict, ngramLangCounts):
         self.ngramsList = ngramsList
@@ -8,10 +10,11 @@ class NaiveBayesClassifier:
         self.ngramLangCountsSum = ngramLangCounts.sum()
         self.pLang = ngramLangCounts / self.ngramLangCountsSum
 
+    # probability of a given ngram in the ngram dictionary
     def pNgram(self, i):
         ngram = self.ngramsList[i]
         pN = self.ngramDict[ngram][0] / self.ngramDict[ngram][0].sum()
-        pL = self.pLang # self.ngramLangCounts / self.ngramLangCountsSum
+        pL = self.pLang # self.ngramLangCounts / self.ngramLangCountsSum # constant, already computed in constructor
         return pN / pL
 
     def pVector(self, vector):

@@ -3,59 +3,64 @@ import queue
 
 import numpy as np
 
-# sklearn's random forest implementation
+import featureExtractor as fe
+import classifier_naiveBayes as nb
+
+# sklearn's classifier implementations
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import SGDClassifier
 
-import featureExtractor as fe
-import classifier_naiveBayes as nb
+########################################################################################################################
+
+# SELECT THE CLASSIFIER TYPE HERE
+
+CLF_type = 'NB'
+# select from:
+# 'NB'      our own implementation of Naive Bayes
+# 'RF'      sklearn's Random Forests Classifier
+# 'AB-RF'   sklearn's Random Forests Classifier with Adaboost
+# 'AB-SGD'  sklearn's Stochastic Gradient Descent Classifier with Adaboost
+# 'NBM'     sklearn's Multinomial Naive Bayes
+# 'MLP'     sklearn's Multi-layer Perceptron
+# other options will not be run
+
+# Warning, 'AB-RF' takes a LOT of RAM (~10-15GB)
+
+# toggles for validation on fake test set, and prediction on the actual test set
+DO_VALIDATE = True
+DO_PREDICT = False
 
 ########################################################################################################################
 
-import multiprocessing as mp
+# will train even if a .pkl is available
+CLASSIFIER_FORCE_RECOMPUTE = True
 
-useAllCpus = True
-if useAllCpus:
-    numProcesses = mp.cpu_count()
-else:
-    numProcesses = max(1, int(mp.cpu_count() / 2)) # will use only half of the available CPUs
+# recompute the dictionary of ngrams
+FULL_DICT_FORCE_RECOMPUTE = False
 
-########################################################################################################################
-
-FORCE_RECOMPUTE = True
-
-BEST_FEATURES_FORCE_RECOMPUTE = FORCE_RECOMPUTE or True
-FULL_DICT_FORCE_RECOMPUTE = False # setting this to True crashes the program for some reason TODO: fix crash
+# recompute the best features from the dictionary (for vectorization)
+BEST_FEATURES_FORCE_RECOMPUTE = CLASSIFIER_FORCE_RECOMPUTE or FULL_DICT_FORCE_RECOMPUTE or True
 
 ########################################################################################################################
-# work in batches because this way RAM usage is a lot lower
-# means that we dont store the entire database at the same time, but work only with a chunk of it
+# work in batches because to minimize RAM usage
+# means that we dont store the entire database at the same time, but work only on a chunk of it
 
 # training
 trainTotalSize = fe.getTrainXFileLineCount()
 trainBatchSize = 1024 * 32
 trainBatchCount = int(np.ceil(trainTotalSize / trainBatchSize))
 
-DO_VALIDATE = True
-
+# validation
 trainValidationSize = fe.getTrainXFileLineCount(True)
 trainValidationBatchCount = int(np.ceil(trainValidationSize / trainBatchSize))
 
-# predicting
-DO_PREDICT = False
-
+# predicts
 predictTotalSize = fe.getTestXFileLineCount()
 predictBatchSize = 1024 * 32
 predictBatchCount = int(np.ceil(predictTotalSize / predictBatchSize))
-
-########################################################################################################################
-# SELECT CLASSIFIER TYPE HERE
-
-CLF_type = 'NB'  # select from: ['RF', 'AB-RF', 'AB-SGD', 'NB', 'NBM', 'MLP']
-# Warning, 'AB-RF' takes a LOT of RAM (~12GB)
 
 ########################################################################################################################
 # Adaboost classifier configuration
@@ -136,11 +141,10 @@ def main():
 
     clf = None
     if CLF_type == 'NB':
-        #
+        # NB does not need to be trained, all the heavy lifting is done when the dictionary is generated
         clf = nb.NaiveBayesClassifier(ngramsList, ngramDict, ngramLangCounts)
     else:
-
-        if not FORCE_RECOMPUTE:
+        if not CLASSIFIER_FORCE_RECOMPUTE:
             clf = fe.pickleReadOrWriteObject(filename=CLF_PKL_name)
         elif clf == None:
             print("Recomputing classifier...")
@@ -156,6 +160,7 @@ def main():
                 tX = np.array(tX)
 
                 if CLF_type == 'MLP':
+                    # ~ 0.73
                     clf = MLPClassifier(solver='lbfgs',
                                         alpha=1e-4,
                                         hidden_layer_sizes = (150,),
@@ -174,14 +179,14 @@ def main():
                     # ~0.75583
                     clf = RandomForestClassifier(n_estimators=RF_n_estimators_per_batch,
                                                  max_depth=RF_max_depth,
-                                                 n_jobs=numProcesses,
+                                                 n_jobs=fe.numProcesses,
                                                  bootstrap=True
                                                  )
                 elif CLF_type == 'AB-RF':
                     # ~0.75766
                     clf = AdaBoostClassifier(base_estimator=RandomForestClassifier(n_estimators=AB_RF_n_estimators,
                                                                                    max_depth=AB_RF_max_depth,
-                                                                                   n_jobs=numProcesses,
+                                                                                   n_jobs=fe.numProcesses,
                                                                                    bootstrap=True
                                                                                    ),
                                              n_estimators=AB_n_estimators_per_batch,
@@ -190,9 +195,9 @@ def main():
                 else:
                     # 0.73905
                     clf = AdaBoostClassifier(base_estimator=SGDClassifier(loss='perceptron',
-                                                                          n_jobs=numProcesses,
+                                                                          n_jobs=fe.numProcesses,
                                                                           learning_rate='optimal',
-                                                                          max_iter=25
+                                                                          max_iter=50
                                                                           ),
                                              algorithm="SAMME",
                                              n_estimators=AB_n_estimators_per_batch,
@@ -237,33 +242,35 @@ def main():
             print("Finished training on {} samples".format(trainTotalSize))
 
     if DO_VALIDATE:
-         print("Validation...")
-         validationBatchNum = 0
-         correct = 0
-         total = 0
-         while validationBatchNum < trainValidationBatchCount:
-             rawtX, tY = fe.readRawTrainingLines(trainValidationSize, trainBatchSize,
-                                                 (validationBatchNum) * trainBatchSize, True)
+        print("Validation...")
+        validationBatchNum = 0
+        correct = 0
+        total = 0
+        while validationBatchNum < trainValidationBatchCount:
+            rawtX, tY = fe.readRawTrainingLines(trainValidationSize, trainBatchSize,
+                                                (validationBatchNum) * trainBatchSize, True)
 
-             if len(rawtX) == 0:
-                 print("read zero rawtx")
-                 break
+            if len(rawtX) == 0:
+                print("read zero rawtx")
+                break
 
-             tX = fe.vectorizeLines(rawtX, ngramDict)
+            tX = fe.vectorizeLines(rawtX, ngramDict)
 
-             tX = np.array(tX)
+            tX = np.array(tX)
 
-             _tY = clf.predict(tX)
+            _tY = clf.predict(tX)
 
-             for y, _y in zip(tY, _tY):
-                 if y == _y:
-                     correct += 1
-                 total += 1
+            for y, _y in zip(tY, _tY):
+                if y == _y:
+                    correct += 1
+                total += 1
 
-             validationBatchNum += 1
-             print("\rValidation progress {}/{}...".format(validationBatchNum, trainValidationBatchCount), end="")
+            validationBatchNum += 1
+            print("\rValidation progress {}/{}...".format(validationBatchNum, trainValidationBatchCount), end="")
 
-         print("Validation ratio: {}/{}={}".format(correct, total, correct / total))
+        print("Validation ratio: {}/{}={}".format(correct, total, correct / total))
+    else:
+        print("Not running validation.")
 
     if DO_PREDICT:
         print("Prediction...")
