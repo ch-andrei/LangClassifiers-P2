@@ -7,7 +7,7 @@ def toCharRangedNgramList(word, nmin = defaultMinN, nmax = None):
         nmax = nmin
 
     if nmin > nmax:
-        raise RuntimeError("Attempting to build ngram list (word) with nmin={} higher than nmax={}.".format(nmin, nmax))
+        raise ValueError("Attempting to build ngram list (word) with nmin={} higher than nmax={}.".format(nmin, nmax))
 
     ngrams = []
 
@@ -24,7 +24,7 @@ def toWordRangedNgramList(line, nmin = defaultMinN, nmax = None):
         nmax = nmin
 
     if nmin > nmax:
-        raise RuntimeError("Attempting to build ngram list (word) with nmin={} higher than nmax={}.".format(nmin, nmax))
+        raise ValueError("Attempting to build ngram list (word) with nmin={} higher than nmax={}.".format(nmin, nmax))
 
     ngrams = []
 
