@@ -102,3 +102,9 @@ ENV/
 
 # pycharm project files
 /.idea
+
+*.csv
+/data/*.csv
+*.pkl
+/data/*.pkl
+*.docx
