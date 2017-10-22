@@ -3,10 +3,12 @@ import time
 from collections import Counter
 from random import shuffle
 import pickle
+import pandas as pd
+
 import featureExtractor as fe
 
 VALIDATION_FRAC = 0.05
-TOP_N_FEATURE = 100
+TOP_N_FEATURE = 1000
 TRIAL = 10
 
 NUM_SAMPLES = fe.NUM_SAMPLES
@@ -33,34 +35,44 @@ def generate_stats(tr):
     p_cls = {}
     # set() returns unique-value list
     classes = list(set([x[1] for x in tr]))
-    # get a list of unique features
-    #top_features = {cls: Counter() for cls in classes}
-    total_freq_per_class = {0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}#{cls: 0 for cls in classes}#{0: 2080596, 1: 19590790, 2: 8545051, 3: 5000797, 4: 1625121}
-    t0 = time.time()
-    #for sample in tr:
-        #top_features[sample[1]] += Counter(sample[0])
-        #total_freq_per_class[sample[1]] += sum(sample[0].values()) #1,2,3grams: {0: 2080596, 1: 19590790, 2: 8545051, 3: 5000797, 4: 1625121}
-    print total_freq_per_class
-    print ('Training t1: ', time.time()-t0)
-    # output of most_common: [('w', 28), ('r', 24)]
-    '''top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
-    features = []
-    for x in top_features:
-        print ('#feature/class: ', len(x), x)
-        features += [y[0] for y in x]
-    #print (len(features), features[:5])
-    features = list(set(features))
-    print features'''
-    # 93 features features = ['\x87', '\x93', '\x9b', ' ', '\xab', '0', '\xb3', '4', '8', '\xbb', '\xc3', 'D', 'H', 'L', 'P', 'T', 'X', 'd', 'h', 'l', 'p', 't', 'x', '\x80', '\x84', '\x94', '\x98', '\x9c', '3', '7', '\xbc', 'C', '\xc4', 'G', 'K', 'O', 'S', 'W', 'c', 'g', 'k', 'o', 's', 'w', '\x81', '\x85', '\x99', '\x9d', '\xa1', '\xa9', '\xb1', '2', '6', '\xb9', '\xbd', 'B', '\xc5', 'F', 'J', 'N', 'R', 'V', 'Z', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x9a', '\x9e', '\xa6', '1', '5', '9', '\xba', 'A', '\xc2', 'E', 'I', 'M', 'U', 'Y', 'a', '\xe2', 'e', 'i', 'm', 'u', 'y']
-    #features = ['\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', ' ', '\xa3', '\xa7', '\xab', '\xaf', '0', '\xb3', '4', '\xb7', '8', '\xbb', '\xbf', '\xc3', '\xcb', '\xcf', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '3', '\xb4', '7', '\xb8', '\xbc', '\xc4', '\xcc', '\xd0', '\xe0', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '2', '\xb5', '6', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '1', '\xb2', '5', '\xb6', '9', '\xba', '\xbe', '\xc2', '\xc6', '\xca', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
 
-    # feture with no numbers and space
-    #features = ['\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', '\xa3', '\xa7', '\xab', '\xaf', '\xb3', '\xb7', '\xbb', '\xbf', '\xc3', '\xcb', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '\xb4', '\xb8', '\xbc', '\xc4', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '\xb5', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '\xb2', '\xb6', '\xba', '\xbe', '\xc2', '\xc6', '\xca', '\xce', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
-    # feature with numbers
-    features = ['0','1','2','3','4','5','6','7','8','9','\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', '\xa3', '\xa7', '\xab', '\xaf', '\xb3', '\xb7', '\xbb', '\xbf', '\xc3', '\xcb', 'd', 'h', 'l', '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4', '\xa8', '\xac', '\xb0', '\xb4', '\xb8', '\xbc', '\xc4', 'c', 'g', 'k', 'o', '\xf0', 's', 'w', '\x81', '\x85', '\x89', '\x8d', '\x91', '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '\xb5', '\xb9', '\xbd', '\xc5', '\xcd', 'b', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86', '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '\xb2', '\xb6', '\xba', '\xbe', '\xc2', '\xc6', '\xca', '\xce', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
+    manual_setup = True
+    # initialize with old results
+    total_freq_per_class = {0: 367919, 1: 3467893, 2: 1539078, 3: 914073, 4: 280178}
+    # all features of 200k fake trainset, w/o space
+    features = ['\x83', '\x87', '\x8b', '\x8f', '\x93', '\x97', '\x9b', '\x9f', '\xa3', '\xa7', '\xab', '\xaf', '0',
+                '\xb3', '4', '\xb7', '8', '\xbb', '\xbf', '\xc3', '\xcb', '\xcf', '\xd7', '\xdb', '\xe3', 'd', 'h', 'l',
+                '\xef', 'p', 't', 'x', '\x80', '\x84', '\x88', '\x8c', '\x90', '\x94', '\x98', '\x9c', '\xa0', '\xa4',
+                '\xa8', '\xac', '\xb0', '3', '\xb4', '7', '\xb8', '\xbc', '\xc4', '\xcc', '\xd0', '\xd4', '\xd8',
+                '\xe0', 'c', '\xe4', 'g', 'k', 'o', '\xf0', 's', 'w', '\x7f', '\x81', '\x85', '\x89', '\x8d', '\x91',
+                '\x95', '\x99', '\x9d', '\xa1', '\xa5', '\xa9', '\xad', '\xb1', '2', '\xb5', '6', '\xb9', '\xbd',
+                '\xc5', '\xcd', '\xd1', '\xd9', '\xe1', 'b', '\xe5', 'f', 'j', 'n', 'r', 'v', 'z', '\x82', '\x86',
+                '\x8a', '\x8e', '\x92', '\x96', '\x9a', '\x9e', '\xa2', '\xa6', '\xaa', '\xae', '1', '\xb2', '5',
+                '\xb6', '9', '\xba', '\xbe', '\xc2', '\xc6', '\xca', '\xce', 'a', '\xe2', 'e', 'i', 'm', 'q', 'u', 'y']
+
+    # generate featuer counts and feature list if not manually set
+    if manual_setup==False:
+        top_features = {cls: Counter() for cls in classes}
+        total_freq_per_class = {cls: 0 for cls in classes}
+        t0 = time.time()
+        for sample in tr:
+            top_features[sample[1]] += Counter(sample[0])
+            total_freq_per_class[sample[1]] += sum(sample[0].values()) #1,2,3grams: {0: 2080596, 1: 19590790, 2: 8545051, 3: 5000797, 4: 1625121}
+        print 'total freq per class',total_freq_per_class
+        print ('Training t1: ', time.time()-t0)
+        # output of most_common: [('w', 28), ('r', 24)]
+        top_features = [x.most_common(TOP_N_FEATURE) for x in top_features.values()]
+        for x in top_features:
+            print ('#feature/class: ', len(x), x)
+            features += [y[0] for y in x]
+        #print (len(features), features[:5])
+        features = list(set(features))
+
+
+
     nfeature = len(features)
-    #print features
-    print ('number of features: ',nfeature)
+    print 'Features: ', features
+    print ('# features: ',nfeature)
     t0 = time.time()
     for cls in classes:
         stats[cls] = {}
@@ -71,10 +83,11 @@ def generate_stats(tr):
             for sample in docs_in_cls:
                 if feature in sample.keys():
                     feature_in_cls += sample[feature]
-            #stats[cls][feature] = float(1 + feature_in_cls)/(nfeature + total_freq_per_class[cls])
-            stats[cls][feature] = float(1 + feature_in_cls) / (2 + total_freq_per_class[cls])
+            stats[cls][feature] = float(1 + feature_in_cls)/(nfeature + total_freq_per_class[cls])
+            #stats[cls][feature] = float(1 + feature_in_cls) / (2 + total_freq_per_class[cls])
     print ('Training t2: ', time.time()-t0)
     save_obj(stats, 'model_{}-{}gram_{}Train_{}Feature_alg2'.format(MIN_GRAM, MAX_GRAM,NUM_SAMPLES,nfeature))
+    print p_cls
     return stats, p_cls
 
 
@@ -91,23 +104,21 @@ def featureProbability(cls, feature, freq, stats):
         return 1
 
 # make prediction: each feature has a prob, take the product of them
-#test = {0:3.0, 1:129.0, 2:64.0, 3:29.0, 4:115.0, 5:26.4, 6: 0.219, 7:28.0}
 def calculateClassProbability(sample, stats, p_cls):
     cls_probabilities = {}
     for cls, feature_stats in stats.iteritems():
         cls_probabilities[cls] = p_cls[cls]
         for feature, freq in sample.iteritems():
             cls_probabilities[cls] *= featureProbability(cls, feature, freq, stats)
+            #cls_probabilities[cls] += math.log(featureProbability(cls, feature, freq, stats),10)
     return cls_probabilities
 
-# predict
+
 def predict(sample, stats, p_cls):
     probabilities = calculateClassProbability(sample, stats, p_cls)
     #print (probabilities)
     best_cls = max(probabilities, key=probabilities.get)
-    #print (best_cls, sample[1])
-    #correct_flag = (best_cls == sample[1])
-    return best_cls #, correct_flag
+    return best_cls
 
 def run_test(tests, stats, p_cls):
     predictions = []
@@ -128,9 +139,31 @@ def run_prediction(data, test):
     train, validation = split_data(data)
     print ('Dataset split into training {}, validation {}'.format(len(train), len(validation)))
     start_time = time.time()
-    stats, p_cls = generate_stats(train)
+
+    load_model = False
+    if load_model==False:
+        # generate model
+        stats, p_cls = generate_stats(train)
+    else:
+        # load model
+        model_name = 'C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\model_1-1gram_264655Train_112Feature_alg2.pkl'
+        stats = pickle.load(open(model_name,'rb'))
+        p_cls = {0: 0.051155159483956436, 1: 0.5110376830572803, 2: 0.2528331766219627, 3: 0.13402819281970071, 4: 0.05094578801709994}
+
     print ('Traing time: ', time.time()-start_time)
 
+    # feature test
+    #features = stats_112[0].keys()
+
+    #for i in range(len(features)):
+        # remove one featuree at each iteration
+    #    fi = features[i]
+    #    stats = pickle.load(open('C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\model_1-1gram_264655Train_112Feature_alg2.pkl','rb'))
+        # remove feature i from model
+    #    for stat in stats.values():
+    #        stat.pop(fi)
+    #    print '#', i, 'Target feature: ', fi
+    #    print len(stats[0]), stats[0].keys()
     print ('______________VALIDATION_______________')
     validation_sample = [x[0] for x in validation]
     validation_answer = [x[1] for x in validation]
@@ -146,14 +179,16 @@ def run_prediction(data, test):
     f.write(outfile)
     f.close()
 
-'''
-def main():
-    # read data
-    df = pd.read_csv(in_file, dtype=float, header=None)
+    # get accuracy
+    dft = pd.read_csv(
+        'C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\\test_result_10.csv')
+    dfa = pd.read_csv(
+        'C:\Users\guanqing\OneDrive\School\FALL 2017\COMP 551\Assignment2\LangClassifiers-P2\Naive Bayes\data\generatedTestSetY-100000.csv')
 
-    run_prediction(df)
+    dfr = dft.merge(dfa, on='Id', how='left')
+    print dfr.head()
+    dfr['result'] = dfr.Category_x == dfr.Category_y
+    print float(len(dfr[dfr.result == True])) / len(dfr), len(dfr[dfr.result == True])
 
-if __name__ == '__main__':
-    main()
-'''
+
 

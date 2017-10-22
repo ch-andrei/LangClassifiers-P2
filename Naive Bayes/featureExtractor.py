@@ -9,13 +9,18 @@ import time
 import ngramGenerator as ng
 
 dataFolderName = "data/"
-trainSetXFilename = "train_set_x_clean.csv"
-trainSetYFilename = "train_set_y_clean.csv"
+trainSetXFilename = "generatedTestSetX-200000.csv"
+trainSetYFilename = "generatedTestSetY-200000.csv"
+#trainSetXFilename = "train_set_x_clean.csv"
+#trainSetYFilename = "train_set_y_clean.csv"
+#trainSetXFilename = "train_set_x.csv"
+#trainSetYFilename = "train_set_y.csv"
+
 testFilename = 'generatedTestSetX-100000.csv'
 #testFilename = 'test_set_x.csv'
 
 numFeaturesMultiplier = 1
-NUM_SAMPLES = 264655#276516
+NUM_SAMPLES = 200000#264655#276516
 maxNumSamples = NUM_SAMPLES * numFeaturesMultiplier
 
 MIN_GRAM = 1

@@ -82,4 +82,32 @@ _________________TEST__________________
 
 
 # smoothing 1/2 instead of 1/#features
+('Generate N gram time: ', 35.50500011444092)
+('Processed', 264655, 'entries from the training data.')
+('Count ngram time: ', 20.95900011062622)
+('len data = ', 264655)
+Dataset split into training 251423, validation 13232
+_______________TRAINING________________
+{0: 708148, 1: 6643363, 2: 2897727, 3: 1698315, 4: 551801}
+('Training t1: ', 0.0010001659393310547)
+('number of features: ', 112)
+('Training t2: ', 77.78399991989136)
+('Traing time: ', 77.94000005722046)
+______________VALIDATION_______________
+('Testing time: ', 14.053999900817871)
+('Accuracy: ', 87.90054413542926, '%')
+_________________TEST__________________
+('Testing time: ', 65.60000014305115)
+('running time: ', 159.22699999809265)
+   Id  Category_x  Category_y
+0   0           1           1
+1   1           1           3
+2   2           1           4
+3   3           1           1
+4   4           1           1
+0.78237 78237
+
+
+# log probability 
+not help 
 
