@@ -13,13 +13,14 @@ def estimateWeights(ps, Epsilon=0):
     return weights / weights.sum() # normalized
 
 def mergeResults(filenames):
-    print(filenames)
+    print("Merging result files", filenames)
 
     weights = np.zeros(len(filenames))
     for index, filename in enumerate(filenames):
         with open(folder + filename, "r", encoding="utf8") as file:
             weights[index] = float(next(file))
     weights = estimateWeights(weights)
+    print("File weights are:", weights)
 
     probabilities = np.zeros((predictCount, len(fe.languageNames)))
     for index, filename in enumerate(filenames):
@@ -62,7 +63,7 @@ def compare(filename1, filename2):
             total += 1
             if not y1 == y2:
                 mistmatch += 1
-        print("mistamtch %:", 100 * mistmatch / total, filename1, "vs", filename2, mistmatch, total)
+        print("difference %:", 100 * mistmatch / total, filename1, "vs", filename2, mistmatch, total)
 
 def compareAll(filenames):
     n = len(filenames)
@@ -78,7 +79,7 @@ def compareAll(filenames):
 def compareOneToAll(file, filenames):
     for _file in filenames:
         if not file == _file:
-            compare(file, _file)
+            compare(file, folder + _file)
 
 def main():
     filenames = [f for f in os.listdir(folder) if isfile(join(folder, f)) and f.__contains__(".csv")]

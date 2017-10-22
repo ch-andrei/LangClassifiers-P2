@@ -4,7 +4,6 @@ import multiprocessing as mp
 from multiprocessing import Process
 
 import numpy as np
-import scipy.sparse as scsp
 
 import ngramGenerator as ng
 
@@ -28,8 +27,10 @@ dictionaryDefaultPickleName = "dictionary.pkl"
 
 # training dataset info
 dataFolderName = "data/"
-trainSetXFilename = "generatedTestSetX-500000.csv"
-trainSetYFilename = "generatedTestSetY-500000.csv"
+trainSetXFilename = "_train_set_x.csv"
+trainSetYFilename = "_train_set_y.csv"
+# trainSetXFilename = "generatedTestSetX-500000.csv"
+# trainSetYFilename = "generatedTestSetY-500000.csv"
 fakeTrainSetXFilename = "generatedTestSetX-100000.csv"
 fakeTrainSetYFilename = "generatedTestSetY-100000.csv"
 testSetXFilename = "test_set_x.csv"
@@ -41,6 +42,8 @@ maxNumEntries = 500000
 # training features extraction parameter
 ngramMin = 1
 ngramMax = 1
+
+MAX_FEATURE_DIM=1000
 
 # produces a dictionary in the format:
 # dictionary = {ngram1: [countInLang1, countInLang2, ..., countinLangN], ngram2: {...}, ...}
@@ -116,6 +119,7 @@ def getTrainClassWeights(labels):
 
 def processTrainLine(line):
     # assuming line format: "id,value"
+    line = line.replace(" ", "")
     line = line.strip()
     return line.split(',')
 
@@ -126,8 +130,6 @@ def processXLine(x):
 
     ngrams = {}
     for ngram in _ngrams:
-        if " " in ngram:
-            continue
         if not ngram in ngrams:
             ngrams[ngram] = 1
         else:
@@ -395,10 +397,16 @@ def sortBestFeatures(dictionary, featureDim):
 
     return bestFeatures[:featureDim]
 
-def ngramImportanceHeuristic(ngram, counts, alpha = 0.1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames)):
+def ngramImportanceHeuristic(ngram, counts, alpha = 1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames), scaleByCounts=True):
     uniquenessFactor = 1 - uniquenessMeasure(counts, n) * 2 / 3.14
     lengthFactor = np.sqrt(len(ngram))
-    return np.log(counts.sum()) * (alpha + lengthInfluence * lengthFactor + uniquenessInfluence * uniquenessFactor)
+    h = lengthInfluence * lengthFactor + uniquenessInfluence * uniquenessFactor
+    if scaleByCounts:
+        h *= (alpha + np.log(counts.sum()))
+    return h
+
+def vectorNgramImportanceHeuristic(ngram, counts):
+    return ngramImportanceHeuristic(ngram, counts, alpha=1, lengthInfluence=0, uniquenessInfluence=100, scaleByCounts=True)
 
 def distanceEuclidean(a, b):
     return np.sqrt(((a-b)**2).sum())
@@ -407,14 +415,14 @@ def cosineAngle(a, b):
     return a.dot(b) / np.sqrt((a*a).sum() * (b*b).sum())
 
 def uniquenessMeasure(a, n, useCosineAngle=True):
-    b = np.ones(n) / n
+    b = np.ones(n) / np.sqrt(n)
     c = a / a.sum()
     if useCosineAngle:
         return cosineAngle(c,b)
     else:
         return distanceEuclidean(c, b)
 
-def processDictionaryAsTrainingFeatures(maxFeatureDim=10000, force_recompute_best=forceBuildNewBestDictionary, force_recompute_dict=forceBuildNewDictionary):
+def processDictionaryAsTrainingFeatures(maxFeatureDim=MAX_FEATURE_DIM, force_recompute_best=forceBuildNewBestDictionary, force_recompute_dict=forceBuildNewDictionary):
     bestFeaturesDictFilename = "ngramListDictCounts_max{}_{}-{}.pkl".format(maxFeatureDim, ngramMin, ngramMax)
 
     ngramListDictCounts = pickleReadOrWriteObject(bestFeaturesDictFilename)
@@ -443,6 +451,9 @@ def processDictionaryAsTrainingFeatures(maxFeatureDim=10000, force_recompute_bes
 
     ngramsList, ngramDict, ngramLangCounts = ngramListDictCounts
 
+    # for ngram, count in ngramDict.items():
+    #     print(ngram, count)
+
     return ngramsList, ngramDict, ngramLangCounts
 
 def vectorizeLines(lines, ngramDict):
@@ -458,20 +469,19 @@ def vectorizeLine(line, ngramDict):
     return vectorizeNgrams(lineNgrams, ngramDict)
 
 def vectorizeNgrams(lineNgrams, ngramDict):
-    vector = np.zeros(len(ngramDict), np.float)
+    vector = np.zeros(len(ngramDict), np.float32)
 
+    ngrams = []
     for ngram, count in lineNgrams.items():
         if ngram in ngramDict:
+            ngrams.append(ngram)
             vector[ngramDict[ngram][1]] += count
 
-    # return scsp.csr_matrix(vector)
-    return vector
+    # # scale by importance heuristic
+    # for ngram in ngrams:
+    #     vector[ngramDict[ngram][1]] *= vectorNgramImportanceHeuristic(ngram, ngramDict[ngram][0])
 
-def printNgramVector(vector, ngramsList):
-    print("Printing vector:")
-    _, indices, counts = scsp.find(vector)
-    for index, count in zip(indices, counts):
-        print("[{}]".format(ngramsList[index]), "index", index, "count:", count)
+    return vector
 
 def main():
     processDictionaryAsTrainingFeatures()
