@@ -1,0 +1,12 @@
+All of the code was implemented on Python 2.7
+Naive Bayes for text classification
+Author Bonnie Guanqing Hu
+
+1. Running
+    > python ./integration.py
+
+    * Default running with the configurations that give the best test result
+
+2. Configuration
+   Please set up trainingFile/testingFile/hyperparameters/... in integration.py
+
