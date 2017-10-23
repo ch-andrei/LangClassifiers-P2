@@ -11,6 +11,7 @@ from collections import Counter
 import queue
 import csv
 import operator
+import pandas
 
 useAllCpus = True
 if useAllCpus:
@@ -24,16 +25,18 @@ maxLinesBeforeDictIsEmptied = 4096 # will build dictionaries in increments of th
 #Chosen parameters #######################################################################################################
 k = 4 #number of nearest neighbors
 num_clust = 50 #number of clusters for each language
-#raw_train = True 
+raw_train = False
 pickle_name = "ngramListDictCounts_max10000_1-1.pkl" #ngram dictionary name
 sort_train = True #process and sort the training set?
-sort_test = False #process and sort the test set?
+sort_test = True 
+BEST_FEATURES_FORCE_RECOMPUTE = False
+FULL_DICT_FORCE_RECOMPUTE = False#process and sort the test set?
 # k (4,10) = 0.4467 5000 full dict, 0.5076 with weights
 # k (12,500) = 0.58 5000 full dict
 # k (4,50) = with the best features
 # testing on the validation set with the best feature dictionary:
 # k (4,10) with real train set - 72.2% !!!!!!!!!
-# k (4,50) with real tain set - 75.63%
+# k (4,50) with real train set - 75.63%
 # k (12,50) with real train set - 0.699566160521
 # k (8, 50) with real train set - 0.7346
 # k (2,50) with real train set - 0.7498
@@ -67,6 +70,9 @@ def sortXtrain (rawtX, tY):
             sorted_lines[lang].append(rawtX[i])
     return sorted_lines
 
+"""
+#processedXtrain = sortXtrain(test_x, test_y)
+"""
 def processXtest_nobatching():
     testX = fe.readRawTestingLines()
     testX = fe.vectorizeLines(testX, ngramDict)
@@ -112,8 +118,7 @@ else:
 def cluster_kmeans (x, n):
     kmeans = KMeans(n_clusters = n, random_state = 0).fit(x)
     return kmeans
-
-   
+  
 def cluster_lang (x):
     kmeans = cluster_kmeans (x, num_clust)   
     cluster_centers = kmeans.cluster_centers_
@@ -131,7 +136,7 @@ lang_4 = cluster_lang (processedXtrain[4])
 train_x = []
 train_y = []
 test_x = processedXtest
-#raw_test_y = (pandas.read_csv('C:/Data/KM/GitHub/LangClassifiers-P2/data/generatedTestSetY-500000.csv')['Category'])
+raw_test_y = (pandas.read_csv('C:/Data/KM/GitHub/LangClassifiers-P2/data/train_set_y.csv')['Category'])
 #test_x, val_test_x, raw_test_y, val_test_y = train_test_split(test_x, raw_test_y, test_size=0.01, random_state=42)
 
 def combine(x, y, tx, ty):
@@ -152,7 +157,7 @@ combine(lang_4, 4, train_x, train_y)
 
 predicted = []
 
-#test_x = val_x
+
 def predict(train_x, train_y, test, k):
     distances = []
     labels = []
@@ -169,7 +174,8 @@ def predict(train_x, train_y, test, k):
     for i in range(k):
         index = distances[i][1]
         #calculate the weight
-        weight = (1/distances[i][0])
+        weight = (1/(distances[i][0]))
+        #weight = 1
         labels.append(train_y[index])
         weights.append(weight)
     #add up class counts after adjusting weights
@@ -203,5 +209,5 @@ for i in range(len(test_y)):
 #raw_test_y = (pandas.read_csv('C:/Data/KM/GitHub/LangClassifiers-P2/data/generatedTestSetY-500000.csv')['Category'])
 #testing accuracy
 acc_pred = np.asarray(test_y)
-print (accuracy_score(val_y, acc_pred))
+print (accuracy_score(raw_test_y, acc_pred))
 
