@@ -30,19 +30,8 @@ pickle_name = "ngramListDictCounts_max10000_1-1.pkl" #ngram dictionary name
 sort_train = True #process and sort the training set?
 sort_test = True 
 BEST_FEATURES_FORCE_RECOMPUTE = False
-FULL_DICT_FORCE_RECOMPUTE = False#process and sort the test set?
-# k (4,10) = 0.4467 5000 full dict, 0.5076 with weights
-# k (12,500) = 0.58 5000 full dict
-# k (4,50) = with the best features
-# testing on the validation set with the best feature dictionary:
-# k (4,10) with real train set - 72.2% !!!!!!!!!
-# k (4,50) with real train set - 75.63%
-# k (12,50) with real train set - 0.699566160521
-# k (8, 50) with real train set - 0.7346
-# k (2,50) with real train set - 0.7498
-#For a 100 clusters with real train set and validation set:
-# k (12, 100) - 0.7653
-# k (4,100) - 0.7707
+FULL_DICT_FORCE_RECOMPUTE = False #process and sort the test set?
+
 
 #Vectorize each class#####################################################################################################
 
@@ -70,9 +59,6 @@ def sortXtrain (rawtX, tY):
             sorted_lines[lang].append(rawtX[i])
     return sorted_lines
 
-"""
-#processedXtrain = sortXtrain(test_x, test_y)
-"""
 def processXtest_nobatching():
     testX = fe.readRawTestingLines()
     testX = fe.vectorizeLines(testX, ngramDict)
@@ -110,9 +96,6 @@ else:
     rawXtrain = pickle.load(open("processedXtrain_nosort.pkl", "rb"))
     print ('Loaded raw trainset')    
     
-#raw_train_x = rawXtrain[0]
-#raw_train_y = rawXtrain[1]    
-#raw_train_x, val_x, raw_train_y, val_y = train_test_split(raw_train_x, raw_train_y, test_size=0.01, random_state=42)
 #kmeans-clustering#######################################################################################################       
 
 def cluster_kmeans (x, n):
@@ -136,8 +119,8 @@ lang_4 = cluster_lang (processedXtrain[4])
 train_x = []
 train_y = []
 test_x = processedXtest
-raw_test_y = (pandas.read_csv('C:/Data/KM/GitHub/LangClassifiers-P2/data/train_set_y.csv')['Category'])
-#test_x, val_test_x, raw_test_y, val_test_y = train_test_split(test_x, raw_test_y, test_size=0.01, random_state=42)
+raw_test_y = (pandas.read_csv('data/train_set_y.csv')['Category'])
+test_x, val_test_x, raw_test_y, val_test_y = train_test_split(test_x, raw_test_y, test_size=0.01, random_state=42)
 
 def combine(x, y, tx, ty):
     lang = y
@@ -156,7 +139,6 @@ combine(lang_4, 4, train_x, train_y)
 #kNN#####################################################################################################################
 
 predicted = []
-
 
 def predict(train_x, train_y, test, k):
     distances = []
@@ -194,7 +176,7 @@ def kNN(train_x, train_y, test_x, predicted, k):
         predicted.append(pr)
     return predicted
     
-test_y = kNN(train_x, train_y, test_x, predicted, k)
+test_y = kNN(train_x, train_y, val_test_x, predicted, k)
 #generate submission file
 for i in range(len(test_y)):
     csvrow = []
@@ -206,8 +188,7 @@ for i in range(len(test_y)):
         row = csv.writer(outputFile)
         row.writerow(csvrow)
 
-#raw_test_y = (pandas.read_csv('C:/Data/KM/GitHub/LangClassifiers-P2/data/generatedTestSetY-500000.csv')['Category'])
-#testing accuracy
+#testing accuracy for validation
 acc_pred = np.asarray(test_y)
-print (accuracy_score(raw_test_y, acc_pred))
+print (accuracy_score(val_test_y, acc_pred))
 
