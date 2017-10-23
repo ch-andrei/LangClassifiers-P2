@@ -31,7 +31,7 @@ CLF_type = 'NB'
 
 # toggles for validation on fake test set, and prediction on the actual test set
 DO_VALIDATE = True
-DO_PREDICT = False
+DO_PREDICT = True
 
 ########################################################################################################################
 
@@ -45,12 +45,12 @@ FULL_DICT_FORCE_RECOMPUTE = False
 BEST_FEATURES_FORCE_RECOMPUTE = CLASSIFIER_FORCE_RECOMPUTE or FULL_DICT_FORCE_RECOMPUTE or True
 
 ########################################################################################################################
-# work in batches because to minimize RAM usage
-# means that we dont store the entire database at the same time, but work only on a chunk of it
+# work in batches in order to minimize RAM usage
+# no need to store the entire database at the same time, work only on a chunk of it
 
 # training
 trainTotalSize = fe.getTrainXFileLineCount()
-trainBatchSize = 1024 * 32
+trainBatchSize = 1024 * 64
 trainBatchCount = int(np.ceil(trainTotalSize / trainBatchSize))
 
 # validation
@@ -68,12 +68,12 @@ predictBatchCount = int(np.ceil(predictTotalSize / predictBatchSize))
 if CLF_type == 'AB-RF':
     AB_n_estimators_max = 64
 else:
-    AB_n_estimators_max = 512
+    AB_n_estimators_max = 1024
 
 AB_n_estimators_per_batch = min(AB_n_estimators_max, max(1, int(AB_n_estimators_max / trainBatchCount)))
-AB_learning_rate = 0.01
+AB_learning_rate = 0.05
 
-AB_RF_n_estimators = 32
+AB_RF_n_estimators = 64
 AB_RF_max_depth = 512
 
 AB_name = "{}_{}-{}grams_{}n-est_{}RF-n-est_{}learnRate_{}train-size".format(
@@ -85,7 +85,7 @@ AB_name = "{}_{}-{}grams_{}n-est_{}RF-n-est_{}learnRate_{}train-size".format(
 
 RF_n_estimators_max = 256
 RF_n_estimators_per_batch = min(RF_n_estimators_max, max(1, int(RF_n_estimators_max / trainBatchCount)))
-RF_max_depth = 512
+RF_max_depth = 1024
 RF_name = "RF_{}-{}grams_{}n-est_{}max-dep_{}train-size".format(fe.ngramMin, fe.ngramMax, RF_n_estimators_max,
                                                                 RF_max_depth, trainTotalSize)
 
@@ -121,7 +121,7 @@ elif CLF_type == 'NB':
     CLF_name = NB_name
 elif CLF_type == 'MLP':
     print("Using MLP classifier.")
-    CLF_name = NBM_name
+    CLF_name = MLP_name
 else:
     print("Unknown classifier selected. Exiting...")
     exit(1)
@@ -160,20 +160,20 @@ def main():
                 tX = np.array(tX)
 
                 if CLF_type == 'MLP':
-                    # ~ 0.73
-                    clf = MLPClassifier(solver='lbfgs',
+                    # ~ 0.77
+                    clf = MLPClassifier(solver='adam',
                                         alpha=1e-4,
-                                        hidden_layer_sizes = (150,),
+                                        hidden_layer_sizes=(142,140,70,68,34,32,16),
                                         activation='relu',
-                                        max_iter=100,
+                                        max_iter=75,
                                         shuffle=True,
                                         warm_start=True,
                                         early_stopping=True,
-                                        validation_fraction=0.1
+                                        validation_fraction=0.15
                                         )
 
                 elif CLF_type == 'NBM':
-                    # ~0.73
+                    # ~0.77
                     clf = MultinomialNB(alpha=NBM_alpha)
                 elif CLF_type == 'RF':
                     # ~0.75583
@@ -212,9 +212,9 @@ def main():
 
                     if CLF_type == 'NBM':
                         classes = [i for i in fe.languageNames]
-                        clf.partial_fit(tX, tY, classes=classes, sample_weight=sampleWeights)
+                        clf.partial_fit(tX, tY, classes=classes)
                     else:
-                        clf.fit(tX, tY, sampleWeights)
+                        clf.fit(tX, tY)
 
                 if not CLF_type == 'NBM':
                     clfs.put(clf)
@@ -236,10 +236,12 @@ def main():
                     clf.estimators_.extend(_clf.estimators_)
                     clf.n_estimators += _clf.n_estimators
 
-            # write RF to pickle
-            fe.pickleReadOrWriteObject(filename=CLF_PKL_name, object=clf)
+            # AB-RF uses too much memory
+            if not CLF_type == 'AB-RF':
+                # write RF to pickle
+                fe.pickleReadOrWriteObject(filename=CLF_PKL_name, object=clf)
 
-            print("Finished training on {} samples".format(trainTotalSize))
+            print("Finished training on {} samples.".format(trainTotalSize))
 
     if DO_VALIDATE:
         print("Validation...")

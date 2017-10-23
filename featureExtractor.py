@@ -29,8 +29,8 @@ dictionaryDefaultPickleName = "dictionary.pkl"
 
 # training dataset info
 dataFolderName = "data/"
-trainSetXFilename = "mergedDatasetX.csv"
-trainSetYFilename = "mergedDatasetY.csv"
+trainSetXFilename = "_train_set_x.csv" # original
+trainSetYFilename = "_train_set_y.csv" # original
 # trainSetXFilename = "generatedTestSetX-500000.csv"
 # trainSetYFilename = "generatedTestSetY-500000.csv"
 
@@ -127,6 +127,7 @@ def getTrainClassWeights(labels):
 def processTrainLine(line):
     # assuming line format: "id,value"
     line = line.strip()
+    line = line.lower()
     line = line.replace(" ", "")
     return line.split(',')
 
@@ -416,13 +417,11 @@ def sortBestFeatures(dictionary, featureDim):
     return bestFeatures[:featureDim]
 
 # estimates ngrams importance based on its length and uniqueness
-def ngramImportanceHeuristic(ngram, counts, alpha = 1, lengthInfluence=0.01, uniquenessInfluence=0.01, n=len(languageNames), scaleByCounts=True):
-    uniquenessFactor = 1 - uniquenessMeasure(counts, n)
+def ngramImportanceHeuristic(ngram, counts, alpha = 0.5, lengthInfluence=0.1, uniquenessInfluence=0.1, n=len(languageNames), scaleByCounts=True):
+    uniquenessFactor = uniquenessMeasure(counts, n)
     lengthFactor = np.sqrt(len(ngram))
     h = lengthInfluence * lengthFactor + uniquenessInfluence * uniquenessFactor
-    if scaleByCounts:
-        h *= (alpha + np.log(counts.sum()))
-    return h
+    return np.log(counts.sum() + 1) * (alpha + h)
 
 def distanceEuclidean(a, b):
     return np.sqrt(((a-b)**2).sum())
@@ -432,13 +431,10 @@ def cosineAngle(a, b):
 
 # estimates the uniquness of an ngram based on the distance of its counts vector to the least unique vector
 # ex: for 2-dimension: [1,1] is the direction of the least unique vector, [0,1] and [1,0] are the most unique vectors
-def uniquenessMeasure(a, n, useCosineAngle=True):
+def uniquenessMeasure(a, n):
     b = np.ones(n) / np.sqrt(n)
     c = a / a.sum()
-    if useCosineAngle:
-        return cosineAngle(c,b) * 2 / 3.14
-    else:
-        return distanceEuclidean(c, b)
+    return 1 - cosineAngle(c,b)
 
 # read or generate a dictionary given the training files
 # returns a tuple representing:
@@ -493,10 +489,8 @@ def vectorizeLine(line, ngramDict):
 
     vector = np.zeros(len(ngramDict), np.float32)
 
-    ngrams = []
     for ngram, count in lineNgrams.items():
         if ngram in ngramDict:
-            ngrams.append(ngram)
             vector[ngramDict[ngram][1]] += count
 
     return vector

@@ -1,20 +1,22 @@
 from random import random
 
+import math
+
 import featureExtractor as fe
 
 BEST_FEATURES_FORCE_RECOMPUTE=True
 FULL_DICT_FORCE_RECOMPUTE=False
 
-samplesToGenerate = 500000
+samplesToGenerate = 200000
 folder = "data/"
 outputFilenameX = folder + "generatedTestSetX-{}.csv".format(samplesToGenerate)
 outputFilenameY = folder + "generatedTestSetY-{}.csv".format(samplesToGenerate)
 
 minSentenceLength = 4
-maxSentenceLength = 32
+maxSentenceLength = 30
 
 def getRandomizedSample(ngramDict, ngramLangCounts):
-    length = int(minSentenceLength + (maxSentenceLength - minSentenceLength)* random())
+    length = int(minSentenceLength + (maxSentenceLength - minSentenceLength) * random())
 
     sumLangCounts = ngramLangCounts.sum()
     langs = sorted(enumerate(ngramLangCounts), key=lambda pair: pair[1], reverse=True)
